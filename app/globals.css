@@ -1,26 +1,478 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ink: #020503;
+  --neon: #39ff14;
+  --neon-soft: #9dff86;
+  --paper: #f1ffec;
+  --muted: #9fb39a;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-anton);
+  --font-wide: var(--font-unbounded);
+  --color-neon: var(--neon);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--ink);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--paper);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  /* Shown if WebGL is unavailable, and for the instant before the scene loads. */
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgb(57 255 20 / 0.08), transparent 60%),
+    var(--ink);
+}
+
+.scene {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ---------- Beats: one full-screen caption per camera stop ---------- */
+
+.beat {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  padding: 5.5rem clamp(1.25rem, 6vw, 6rem) clamp(2rem, 7vh, 4.5rem);
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.45s ease, transform 0.6s ease;
+  pointer-events: none;
+}
+
+.beat.on {
+  opacity: 1;
+  transform: none;
+  transition-delay: 0.15s;
+}
+
+.beat.on :is(a, button) {
+  pointer-events: auto;
+}
+
+.eyebrow,
+.hint,
+.host,
+.footnote {
+  font-family: var(--font-unbounded), sans-serif;
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.eyebrow {
+  color: var(--neon-soft);
+  text-shadow: 0 0 14px rgb(57 255 20 / 0.6), 0 1px 10px #000;
+}
+
+.statement {
+  margin-top: 1rem;
+  max-width: 16ch;
+  font-family: var(--font-unbounded), sans-serif;
+  font-size: clamp(1.7rem, 5.4vw, 4rem);
+  font-weight: 800;
+  line-height: 1.08;
+  text-transform: uppercase;
+  text-wrap: balance;
+  text-shadow: 0 2px 30px #000, 0 0 60px #000;
+}
+
+.statement em {
+  font-style: normal;
+  color: var(--neon);
+  text-shadow: 0 0 18px rgb(57 255 20 / 0.8), 0 0 60px rgb(57 255 20 / 0.5);
+}
+
+.genre {
+  margin-top: 0.4rem;
+  font-family: var(--font-anton), Impact, sans-serif;
+  font-size: clamp(4rem, 13vw, 10.5rem);
+  line-height: 0.92;
+  text-transform: uppercase;
+  text-shadow: 0 4px 40px #000, 0 0 80px #000;
+}
+
+.line {
+  margin-top: 0.9rem;
+  max-width: 30ch;
+  font-size: clamp(1rem, 1.6vw, 1.2rem);
+  line-height: 1.5;
+  color: #d6e6d1;
+  text-shadow: 0 1px 14px #000, 0 0 30px #000;
+}
+
+/* ---------- The sign ---------- */
+
+.title {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 0.9rem;
+  /* One number scales the whole sign; it must fit both narrow and short screens. */
+  font-size: clamp(5rem, min(31vw, 30vh), 17rem);
+  font-family: var(--font-anton), Impact, sans-serif;
+  line-height: 0.86;
+  text-transform: uppercase;
+}
+
+.title-city {
+  margin-bottom: 0.3em;
+  font-size: 0.24em;
+  letter-spacing: 0.16em;
+  color: #6b736a;
+  transition: color 1.2s ease 0.6s;
+}
+
+.title-neon,
+.title-night {
+  transition: color 0.2s, -webkit-text-stroke-color 0.2s, filter 0.2s;
+}
+
+/* Unlit: grey glass tubes you can only just make out. */
+.title-neon {
+  font-size: 0.66em;
+  letter-spacing: 0.04em;
+  color: transparent;
+  -webkit-text-stroke: 0.022em #2a332a;
+}
+
+.title-night {
+  color: #0d130d;
+  -webkit-text-stroke: 0.012em #2a332a;
+}
+
+.title.lit .title-city {
+  color: #aab5a8;
+}
+
+.title.lit .title-neon {
+  -webkit-text-stroke-color: #e6ffdf;
+  filter: drop-shadow(0 0 0.03em var(--neon)) drop-shadow(0 0 0.1em var(--neon))
+    drop-shadow(0 0 0.3em rgb(57 255 20 / 0.55));
+  animation: catch 1.5s linear both, buzz 7s linear 2s infinite;
+}
+
+.title.lit .title-night {
+  color: var(--neon);
+  -webkit-text-stroke-color: #0c5a00;
+  filter: drop-shadow(0 0 0.06em rgb(57 255 20 / 0.9)) drop-shadow(0 0 0.32em rgb(57 255 20 / 0.5));
+  animation: catch 1.9s linear 0.25s both;
+}
+
+/* A tube stuttering before it holds. */
+@keyframes catch {
+  0%, 12%, 20%, 34%, 46% { opacity: 0.12; filter: none; }
+  8%, 16%, 28%, 40%, 52%, 100% { opacity: 1; }
+}
+
+@keyframes buzz {
+  0%, 91%, 94%, 100% { opacity: 1; }
+  92.5% { opacity: 0.55; }
+}
+
+.plate {
+  position: absolute;
+  top: 0.62em;
+  right: -0.1em;
+  padding: 0.14em 0.42em 0.06em;
+  border: 0.07em solid #a8231c;
+  border-radius: 0.18em;
+  outline: 0.05em solid #e4d9bb;
+  background: #e4d9bb;
+  color: #2b1b14;
+  font-size: 0.2em;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  rotate: -7deg;
+  box-shadow: 0 0.3em 0.8em rgb(0 0 0 / 0.7);
+  filter: brightness(0.35);
+  transition: filter 1s ease 0.5s;
+}
+
+.plate-back {
+  top: 0.32em;
+  right: 0.05em;
+  background: #b3261e;
+  outline-color: #b3261e;
+  border-color: #e4d9bb;
+  color: #e4d9bb;
+  rotate: 174deg;
+}
+
+.title.lit .plate {
+  filter: none;
+}
+
+.soon {
+  font-family: var(--font-unbounded), sans-serif;
+  font-size: clamp(1.25rem, 4.4vw, 2.4rem);
+  font-weight: 900;
+  text-transform: uppercase;
+  text-shadow: 0 2px 24px #000;
+}
+
+.soon-big {
+  margin-top: 0.6rem;
+  font-size: clamp(1.9rem, 7.4vw, 5rem);
+  line-height: 1;
+}
+
+/* ---------- Controls ---------- */
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 3.25rem;
+  padding: 0 1.9rem;
+  border: 1.5px solid var(--neon);
+  border-radius: 999px;
+  background: rgb(57 255 20 / 0.1);
+  color: var(--paper);
+  font-family: var(--font-unbounded), sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 0 22px rgb(57 255 20 / 0.35), inset 0 0 18px rgb(57 255 20 / 0.18);
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s;
+  animation: breathe 2.4s ease-in-out infinite;
+}
+
+.switch:hover {
+  background: var(--neon);
+  color: #031201;
+  box-shadow: 0 0 44px rgb(57 255 20 / 0.7);
+}
+
+.switch:active {
+  transform: scale(0.97);
+}
+
+@keyframes breathe {
+  50% { box-shadow: 0 0 38px rgb(57 255 20 / 0.6), inset 0 0 22px rgb(57 255 20 / 0.28); }
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding: 0 0.95rem;
+  border: 1px solid rgb(157 255 134 / 0.35);
+  border-radius: 999px;
+  background: rgb(2 8 3 / 0.55);
+  backdrop-filter: blur(8px);
+  color: var(--paper);
+  font-family: var(--font-unbounded), sans-serif;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.chip:hover {
+  border-color: var(--neon);
+}
+
+.chip-solid {
+  border-color: var(--neon);
+  background: var(--neon);
+  color: #031201;
+}
+
+.chip-lg {
+  min-height: 3.25rem;
+  padding: 0 1.5rem;
+  font-size: 0.72rem;
+}
+
+:is(.switch, .chip):focus-visible {
+  outline: 2px solid var(--paper);
+  outline-offset: 3px;
+}
+
+.eq {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 0.7rem;
+}
+
+.eq i {
+  width: 2px;
+  height: 30%;
+  background: currentColor;
+}
+
+.eq.playing i {
+  animation: eq 0.47s ease-in-out infinite alternate;
+}
+
+.eq.playing i:nth-child(2) { animation-delay: -0.2s; }
+.eq.playing i:nth-child(3) { animation-delay: -0.35s; }
+
+@keyframes eq {
+  to { height: 100%; }
+}
+
+.topbar {
+  position: fixed;
+  inset: 0 0 auto;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem clamp(1rem, 4vw, 2.5rem);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.8s ease 1.2s, visibility 0s 1.2s;
+}
+
+.topbar.on {
+  opacity: 1;
+  visibility: visible;
+}
+
+.host {
+  max-width: 22ch;
+  line-height: 1.5;
+  color: var(--paper);
+  text-shadow: 0 1px 10px #000;
+}
+
+@media (max-width: 480px) {
+  .host {
+    max-width: 13ch;
+    font-size: 0.5rem;
+    letter-spacing: 0.2em;
+  }
+
+  .topbar .chip {
+    padding: 0 0.75rem;
+    letter-spacing: 0.12em;
+  }
+}
+
+.progress {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 2px;
+  background: var(--neon);
+  box-shadow: 0 0 10px var(--neon);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.scroll-line {
+  width: 1px;
+  height: 2.6rem;
+  background: linear-gradient(var(--neon), transparent);
+  animation: drop 1.8s ease-in-out infinite;
+  transform-origin: top;
+}
+
+@keyframes drop {
+  0% { transform: scaleY(0); opacity: 1; }
+  70% { transform: scaleY(1); opacity: 1; }
+  100% { transform: scaleY(1); opacity: 0; }
+}
+
+/* ---------- Landing ---------- */
+
+.landing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.landing::before {
+  /* Darkens the floor behind the text without boxing it in. */
+  content: "";
+  position: fixed;
+  inset: 35% 0 0;
+  z-index: -1;
+  background: linear-gradient(transparent, rgb(1 4 2 / 0.86) 55%);
+}
+
+.countdown {
+  display: flex;
+  gap: clamp(0.9rem, 4vw, 2.2rem);
+  margin-top: 1.2rem;
+}
+
+.countdown div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.countdown b {
+  font-family: var(--font-anton), Impact, sans-serif;
+  font-size: clamp(2.2rem, 8vw, 4rem);
+  font-weight: 400;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--neon);
+  text-shadow: 0 0 22px rgb(57 255 20 / 0.6);
+}
+
+.countdown span {
+  font-family: var(--font-unbounded), sans-serif;
+  font-size: 0.55rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.genres {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.4rem clamp(0.9rem, 3vw, 2.2rem);
+  margin-top: 1.8rem;
+  font-family: var(--font-unbounded), sans-serif;
+  font-size: clamp(0.6rem, 1.5vw, 0.8rem);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.footnote {
+  margin-top: 1rem;
+  font-size: 0.55rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .beat,
+  .beat.on {
+    transform: none;
+    transition: opacity 0.2s;
+  }
+
+  .title.lit :is(.title-neon, .title-night),
+  .switch,
+  .scroll-line,
+  .eq.playing i {
+    animation: none;
+  }
 }
