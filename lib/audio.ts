@@ -9,19 +9,27 @@ const ROOTS = [55, 55, 43.65, 49];
 const BASS_STEPS = new Set([2, 3, 6, 7, 10, 11, 14]);
 const LEVEL = 0.5;
 
-let ctx: AudioContext | null = null;
-let master: GainNode;
-let filter: BiquadFilterNode;
-let noise: AudioBuffer;
-let step = 0;
-let nextTime = 0;
-let origin = 0;
-let muted = false;
+type Engine = {
+  ctx: AudioContext;
+  master: GainNode;
+  filter: BiquadFilterNode;
+  noise: AudioBuffer;
+  step: number;
+  nextTime: number;
+  origin: number;
+  /** True once the loop has been given its start time. */
+  begun: boolean;
+};
 
-function burst(t: number, type: BiquadFilterType, freq: number, level: number, dur: number, out: AudioNode) {
-  if (!ctx) return;
+// Kept on globalThis so a hot reload in development reuses the one engine
+// instead of leaving the old loop playing underneath a new one.
+const state = ((globalThis as unknown as { __neonNightAudio?: { engine: Engine | null; muted: boolean } })
+  .__neonNightAudio ??= { engine: null, muted: false });
+
+function burst(e: Engine, t: number, type: BiquadFilterType, freq: number, level: number, dur: number, out: AudioNode) {
+  const { ctx } = e;
   const src = ctx.createBufferSource();
-  src.buffer = noise;
+  src.buffer = e.noise;
   const f = ctx.createBiquadFilter();
   f.type = type;
   f.frequency.value = freq;
@@ -32,8 +40,7 @@ function burst(t: number, type: BiquadFilterType, freq: number, level: number, d
   src.start(t, Math.random() * 0.5, dur + 0.02);
 }
 
-function kick(t: number) {
-  if (!ctx) return;
+function kick({ ctx, filter }: Engine, t: number) {
   const o = ctx.createOscillator();
   const g = ctx.createGain();
   o.frequency.setValueAtTime(150, t);
@@ -45,8 +52,7 @@ function kick(t: number) {
   o.stop(t + 0.36);
 }
 
-function bass(t: number, freq: number) {
-  if (!ctx) return;
+function bass({ ctx, filter }: Engine, t: number, freq: number) {
   const o = ctx.createOscillator();
   o.type = "sawtooth";
   o.frequency.value = freq;
@@ -62,30 +68,31 @@ function bass(t: number, freq: number) {
   o.stop(t + STEP);
 }
 
-function schedule() {
-  if (!ctx || ctx.state !== "running") return;
-  if (nextTime < ctx.currentTime) {
+function schedule(e: Engine) {
+  const { ctx } = e;
+  if (!e.begun || ctx.state !== "running") return;
+  if (e.nextTime < ctx.currentTime) {
     // Fell behind (tab was in the background): skip ahead on the beat grid.
-    const missed = Math.ceil((ctx.currentTime + 0.05 - nextTime) / STEP);
-    nextTime += missed * STEP;
-    step += missed;
+    const missed = Math.ceil((ctx.currentTime + 0.05 - e.nextTime) / STEP);
+    e.nextTime += missed * STEP;
+    e.step += missed;
   }
-  while (nextTime < ctx.currentTime + 0.15) {
-    const s = step % 16;
-    if (s % 4 === 0) kick(nextTime);
-    if (s % 4 === 2) burst(nextTime, "highpass", 8000, 0.16, 0.05, filter);
-    if (s === 4 || s === 12) burst(nextTime, "bandpass", 1500, 0.32, 0.14, filter);
-    if (BASS_STEPS.has(s)) bass(nextTime, ROOTS[Math.floor(step / 16) % ROOTS.length]);
-    nextTime += STEP;
-    step++;
+  while (e.nextTime < ctx.currentTime + 0.15) {
+    const s = e.step % 16;
+    if (s % 4 === 0) kick(e, e.nextTime);
+    if (s % 4 === 2) burst(e, e.nextTime, "highpass", 8000, 0.16, 0.05, e.filter);
+    if (s === 4 || s === 12) burst(e, e.nextTime, "bandpass", 1500, 0.32, 0.14, e.filter);
+    if (BASS_STEPS.has(s)) bass(e, e.nextTime, ROOTS[Math.floor(e.step / 16) % ROOTS.length]);
+    e.nextTime += STEP;
+    e.step++;
   }
 }
 
 /** The crackle of a neon tube catching, played once at switch-on. */
-function zap(t: number) {
-  if (!ctx) return;
+function zap(e: Engine, t: number) {
+  const { ctx, master } = e;
   for (const [at, dur] of [[0, 0.05], [0.09, 0.04], [0.24, 0.09], [0.52, 0.06]]) {
-    burst(t + at, "bandpass", 3200, 0.22, dur, master);
+    burst(e, t + at, "bandpass", 3200, 0.22, dur, master);
   }
   const hum = ctx.createOscillator();
   hum.type = "sawtooth";
@@ -99,50 +106,89 @@ function zap(t: number) {
   hum.stop(t + 2.7);
 }
 
-/** Must be called from a tap or click, or the browser will block it. */
-export function startAudio() {
-  if (ctx) return;
+/** Starts the crackle and the first kick together, timed off the audio clock. */
+function begin(e: Engine) {
+  if (e.begun || e.ctx.state !== "running") return;
+  e.begun = true;
+  // A short lead so nothing is clipped while the output device wakes up.
+  const t = e.ctx.currentTime + 0.06;
+  zap(e, t);
+  e.origin = e.nextTime = t;
+  schedule(e);
+}
+
+function build(): Engine | null {
   const AC =
     window.AudioContext ??
     (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AC) return;
-  ctx = new AC();
-  master = ctx.createGain();
-  master.gain.value = muted ? 0 : LEVEL;
+  if (!AC) return null;
+  const ctx = new AC();
+  const master = ctx.createGain();
+  master.gain.value = state.muted ? 0 : LEVEL;
   master.connect(ctx.destination);
-  filter = ctx.createBiquadFilter();
+  const filter = ctx.createBiquadFilter();
   filter.type = "lowpass";
   filter.frequency.value = 160;
   filter.Q.value = 0.9;
   filter.connect(master);
-  noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
+  const noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   const data = noise.getChannelData(0);
   for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const e: Engine = { ctx, master, filter, noise, step: 0, nextTime: 0, origin: 0, begun: false };
 
-  zap(ctx.currentTime + 0.02);
-  origin = nextTime = ctx.currentTime + 0.9;
-  window.setInterval(schedule, 40);
+  window.setInterval(() => schedule(e), 40);
+
+  // Browsers can leave the context suspended (first load, returning to the
+  // tab, a phone call). Any later tap or key press wakes it and, if the loop
+  // never got going, starts it then.
+  const wake = () => {
+    if (document.hidden) return;
+    if (ctx.state === "running") begin(e);
+    else void ctx.resume().then(() => begin(e), () => undefined);
+  };
+  window.addEventListener("pointerdown", wake);
+  window.addEventListener("keydown", wake);
   document.addEventListener("visibilitychange", () => {
-    if (!ctx) return;
     if (document.hidden) void ctx.suspend();
-    else void ctx.resume();
+    else wake();
   });
+  return e;
+}
+
+/**
+ * Call from a tap or click, or the browser will block it. Resolves once sound
+ * is actually running, so the caller can fire visuals on the same moment.
+ */
+export async function startAudio() {
+  const e = state.engine ?? (state.engine = build());
+  if (!e) return;
+  if (e.ctx.state !== "running") {
+    try {
+      await e.ctx.resume();
+    } catch {
+      // Still blocked; the wake listeners will retry on the next interaction.
+    }
+  }
+  begin(e);
 }
 
 export function setMuted(value: boolean) {
-  muted = value;
-  if (ctx) master.gain.setTargetAtTime(value ? 0 : LEVEL, ctx.currentTime, 0.08);
+  state.muted = value;
+  const e = state.engine;
+  if (e) e.master.gain.setTargetAtTime(value ? 0 : LEVEL, e.ctx.currentTime, 0.08);
 }
 
 /** 0 = outside, hearing it through the wall. 1 = standing on the floor. */
 export function setOpenness(amount: number) {
-  if (!ctx) return;
+  const e = state.engine;
+  if (!e) return;
   const a = Math.min(1, Math.max(0, amount));
-  filter.frequency.setTargetAtTime(160 * Math.pow(90, a), ctx.currentTime, 0.12);
+  e.filter.frequency.setTargetAtTime(160 * Math.pow(90, a), e.ctx.currentTime, 0.12);
 }
 
 /** Beats elapsed since the loop started, or null when no audio is running. */
 export function beatClock() {
-  if (!ctx || ctx.state !== "running" || ctx.currentTime < origin) return null;
-  return ((ctx.currentTime - origin) * BPM) / 60;
+  const e = state.engine;
+  if (!e || !e.begun || e.ctx.state !== "running" || e.ctx.currentTime < e.origin) return null;
+  return ((e.ctx.currentTime - e.origin) * BPM) / 60;
 }

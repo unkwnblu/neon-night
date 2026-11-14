@@ -74,6 +74,7 @@ export default function Experience() {
   const [sound, setSound] = useState(true);
   const [copied, setCopied] = useState(false);
   const bar = useRef<HTMLDivElement>(null);
+  const entering = useRef(false);
 
   // Start every visit at the door, and hold the visitor there until the lights are on.
   useEffect(() => {
@@ -106,9 +107,13 @@ export default function Experience() {
     };
   }, []);
 
-  const enter = () => {
+  const enter = async () => {
+    if (entering.current) return;
+    entering.current = true;
+    // Wait for sound to really be running so the tubes and the first kick land
+    // together, but never keep the lights waiting if audio is blocked.
+    await Promise.race([startAudio(), new Promise((done) => setTimeout(done, 350))]);
     stage.power = 1;
-    startAudio();
     setEntered(true);
   };
 
