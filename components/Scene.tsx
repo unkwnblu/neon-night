@@ -236,9 +236,9 @@ function ArtistSigns({ signs }: { signs: SignArt[] }) {
     <>
       {signs.map(({ material, aspect }, i) => {
         const side = signSide(i);
-        // Big enough to show an artist photo; the corridor fits about 1.8m at this angle.
-        const height = 1.8;
-        const width = Math.min(2.1, height * aspect);
+        // Big enough to show an artist photo; the corridor fits about 2.2m at this angle.
+        const height = 2.2;
+        const width = Math.min(2.4, height * aspect);
         return (
           // Angled out from the wall to face people walking in.
           <group key={i} position={[side * 1.55, 2.4, SIGN_Z[i]]} rotation-y={-side * 0.95}>

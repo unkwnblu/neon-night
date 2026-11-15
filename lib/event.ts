@@ -35,7 +35,7 @@ export const ARTISTS: Artist[] = [
  */
 export const DJS: Artist[] = [
   { name: "DJ Remix", image: "/djs/dj-remix.jpg" },
-  { name: null, image: null },
+  { name: "DJ Gecho", image: "/djs/dj-gecho.jpg" },
 ];
 
 /** hero, intro, one per artist, the floor, landing */
