@@ -77,13 +77,13 @@ export function signCanvas(text: string, family: string) {
   ctx.textBaseline = "middle";
   ctx.lineJoin = "round";
   ctx.shadowColor = "#39ff14";
-  ctx.shadowBlur = 36;
+  ctx.shadowBlur = 16;
   ctx.strokeStyle = "#4dff2a";
-  ctx.lineWidth = 11;
+  ctx.lineWidth = 9;
   ctx.strokeText(text, width / 2, H / 2 + 8);
   ctx.shadowBlur = 0;
   ctx.strokeStyle = "#eaffe2";
-  ctx.lineWidth = 3.5;
+  ctx.lineWidth = 4.5;
   ctx.strokeText(text, width / 2, H / 2 + 8);
   return { canvas: c, aspect: width / H };
 }

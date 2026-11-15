@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
-import { setMuted, setOpenness, startAudio } from "@/lib/audio";
+import { setMuted, setOpenness, startAudio, stopAudio } from "@/lib/audio";
 import { BEAT_COUNT, EVENT, GENRES } from "@/lib/event";
 import { stage } from "@/lib/stage";
 
@@ -75,12 +75,18 @@ export default function Experience() {
   const [copied, setCopied] = useState(false);
   const bar = useRef<HTMLDivElement>(null);
   const entering = useRef(false);
+  const scene = useRef<HTMLDivElement>(null);
 
   // Start every visit at the door, and hold the visitor there until the lights are on.
   useEffect(() => {
     history.scrollRestoration = "manual";
     window.scrollTo(0, 0);
   }, []);
+  // Nothing plays while the lights are off. This also silences a loop left
+  // running if the page returns to the gate without a full reload.
+  useEffect(() => {
+    if (!entered) stopAudio();
+  }, [entered]);
   useEffect(() => {
     document.documentElement.style.overflow = entered ? "" : "hidden";
     return () => {
@@ -90,7 +96,11 @@ export default function Experience() {
 
   useEffect(() => {
     const onScroll = () => {
-      const max = document.documentElement.scrollHeight - window.innerHeight;
+      // Measured against the scene, whose height ignores the phone's address bar
+      // sliding in and out. Using the live window height would nudge the camera
+      // every time the bar moved.
+      const screen = scene.current?.offsetHeight || window.innerHeight;
+      const max = document.documentElement.scrollHeight - screen;
       const p = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
       stage.progress = p;
       // Fully "inside" by the time the first genre sign comes up.
@@ -143,12 +153,12 @@ export default function Experience() {
 
   return (
     <main>
-      <div className="scene" aria-hidden>
-        <Scene />
+      <div ref={scene} className="scene" aria-hidden>
+        <Scene active={entered} />
       </div>
 
       {/* Scrolling this empty track is what walks the camera through the building. */}
-      <div style={{ height: `calc(${LAST_BEAT} * 135vh + 100vh)` }} />
+      <div className="track" style={{ "--beats": LAST_BEAT } as React.CSSProperties} />
 
       <header className={`topbar ${entered ? "on" : ""}`}>
         <span className="host">{EVENT.host}</span>

@@ -28,11 +28,20 @@ body {
     var(--ink);
 }
 
+/* Both are sized to the tallest the screen gets (address bar hidden), so
+   neither the canvas nor the scroll length changes when the bar moves. */
 .scene {
   position: fixed;
-  inset: 0;
+  inset: 0 0 auto;
+  height: 100vh;
+  height: 100lvh;
   z-index: 0;
   pointer-events: none;
+}
+
+.track {
+  height: calc(var(--beats) * 135vh + 100vh);
+  height: calc(var(--beats) * 135lvh + 100lvh);
 }
 
 /* ---------- Beats: one full-screen caption per camera stop ---------- */

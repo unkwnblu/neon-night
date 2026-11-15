@@ -23,7 +23,7 @@ const HALL_END = -68;
 const HALF_CORRIDOR = 2.5;
 const HALF_HALL = 11;
 const BOOTH_Z = -60.5;
-const HOOP_COUNT = 10;
+const HOOP_COUNT = 9;
 const SIGN_Z = GENRES.map((_, i) => -11 - i * 8);
 /** Left wall first, then alternating. */
 const signSide = (i: number) => (i % 2 === 0 ? -1 : 1);
@@ -59,7 +59,7 @@ const dustMaterial = new THREE.PointsMaterial({
 });
 
 const dark = new THREE.MeshStandardMaterial({ color: "#060806", roughness: 0.7 });
-const signBoard = new THREE.MeshBasicMaterial({ color: "#020402", transparent: true, opacity: 0.9 });
+const signBoard = new THREE.MeshBasicMaterial({ color: "#020402" });
 const floorMaterial = new THREE.MeshStandardMaterial({ color: "#0b0e0b", roughness: 0.32, metalness: 0.55 });
 const streetMaterial = new THREE.MeshStandardMaterial({ color: "#0a0b0a", roughness: 0.45, metalness: 0.3 });
 
@@ -163,7 +163,9 @@ function Corridor() {
       <BrickWall size={[length, height]} position={[-HALF_CORRIDOR, height / 2, mid]} rotationY={Math.PI / 2} />
       <BrickWall size={[length, height]} position={[HALF_CORRIDOR, height / 2, mid]} rotationY={-Math.PI / 2} />
       {hoopGlow.map((material, i) => {
-        const z = -1 - i * 4;
+        // Spaced so each sign has one hoop 3m before it and one 1m behind it.
+        // The camera stops inside the nearer hoop, so no tube crosses the lettering.
+        const z = -4 - i * 4;
         return (
           <group key={i}>
             <Tube size={[0.06, height, 0.06]} position={[-HALF_CORRIDOR + 0.08, height / 2, z]} material={material} />
@@ -229,7 +231,7 @@ function GenreSigns({ signs }: { signs: SignArt[] }) {
       {signs.map(({ material, aspect }, i) => {
         const side = signSide(i);
         const height = 0.82;
-        const width = Math.min(2.5, height * aspect);
+        const width = Math.min(2.1, height * aspect);
         return (
           // Angled out from the wall to face people walking in.
           <group key={i} position={[side * 1.55, 2.35, SIGN_Z[i]]} rotation-y={-side * 0.95}>
@@ -275,18 +277,31 @@ const DUST = (() => {
 const LASERS = Array.from({ length: 12 }, (_, i) => ({ spread: (i - 5.5) * 0.13, seed: rand() * 6 }));
 const dummy = new THREE.Object3D();
 
+/**
+ * 2 = desktop, 1 = phones and modest laptops, 0 = struggling devices.
+ * Devices start at 1 or 2 and step down if they cannot hold the frame rate.
+ */
+type Tier = 0 | 1 | 2;
+const CROWD_SIZE = [50, 70, PEOPLE.length] as const;
+const MAX_DPR = [1, 1.5, 1.5] as const;
+/** Glow strength. Softer on phones, where the same halo covers more of a small screen. */
+const BLOOM = [0, 0.8, 1.15] as const;
+
+/** Which parts of the building are worth drawing from where the camera is. */
+const zone = { street: true, corridor: true, hall: false };
+
 /** Beats since the music started, or a silent clock at the same tempo. */
 const beats = (elapsed: number) => beatClock() ?? (elapsed * BPM) / 60;
 
-function Crowd() {
+function Crowd({ size }: { size: number }) {
   const bodies = useRef<THREE.InstancedMesh>(null);
   const heads = useRef<THREE.InstancedMesh>(null);
   const arms = useRef<THREE.InstancedMesh>(null);
 
   useFrame(({ clock }) => {
-    if (!bodies.current || !heads.current || !arms.current) return;
+    if (!zone.hall || !bodies.current || !heads.current || !arms.current) return;
     const beat = beats(clock.elapsedTime);
-    PEOPLE.forEach((p, i) => {
+    PEOPLE.slice(0, size).forEach((p, i) => {
       const hop = 0.11 * Math.abs(Math.sin(Math.PI * (beat + p.phase * 0.25))) * p.scale;
       dummy.rotation.set(0, 0, 0);
       dummy.scale.setScalar(p.scale);
@@ -311,13 +326,13 @@ function Crowd() {
 
   return (
     <>
-      <instancedMesh ref={bodies} args={[undefined, undefined, PEOPLE.length]} material={dark} frustumCulled={false}>
+      <instancedMesh ref={bodies} args={[undefined, undefined, PEOPLE.length]} count={size} material={dark} frustumCulled={false}>
         <capsuleGeometry args={[0.21, 0.85, 3, 8]} />
       </instancedMesh>
-      <instancedMesh ref={heads} args={[undefined, undefined, PEOPLE.length]} material={dark} frustumCulled={false}>
+      <instancedMesh ref={heads} args={[undefined, undefined, PEOPLE.length]} count={size} material={dark} frustumCulled={false}>
         <sphereGeometry args={[0.15, 10, 8]} />
       </instancedMesh>
-      <instancedMesh ref={arms} args={[undefined, undefined, PEOPLE.length * 2]} material={dark} frustumCulled={false}>
+      <instancedMesh ref={arms} args={[undefined, undefined, PEOPLE.length * 2]} count={size * 2} material={dark} frustumCulled={false}>
         <boxGeometry args={[0.075, 0.62, 0.075]} />
       </instancedMesh>
     </>
@@ -333,6 +348,7 @@ function Lasers() {
   }, []);
 
   useFrame(({ clock }) => {
+    if (!zone.hall) return;
     const t = clock.elapsedTime;
     pivots.current.forEach((pivot, i) => {
       if (!pivot) return;
@@ -353,7 +369,7 @@ function Lasers() {
   );
 }
 
-function Hall({ art }: { art: Art | null }) {
+function Hall({ art, crowd }: { art: Art | null; crowd: number }) {
   const depth = CORRIDOR_END - HALL_END;
   const mid = (CORRIDOR_END + HALL_END) / 2;
   const height = 10;
@@ -405,7 +421,7 @@ function Hall({ art }: { art: Art | null }) {
       )}
 
       <Lasers />
-      <Crowd />
+      <Crowd size={crowd} />
     </>
   );
 }
@@ -420,8 +436,8 @@ function cameraStops(portrait: boolean) {
     ...SIGN_Z.map((z, i) => {
       const side = signSide(i);
       return portrait
-        ? { position: v(-side * 0.9, 1.7, z + 5.4), target: v(side * 1.45, 1.75, z) }
-        : { position: v(-side * 0.6, 1.75, z + 4), target: v(side * 0.55, 2.2, z) };
+        ? { position: v(-side * 0.9, 1.7, z + 2.8), target: v(side * 1.5, 1.95, z) }
+        : { position: v(-side * 0.6, 1.75, z + 2.8), target: v(side * 0.45, 2.2, z) };
     }),
     { position: v(0, 2, CORRIDOR_END - 1.5), target: v(0, 3.4, BOOTH_Z) },
     { position: v(0, 3.4, CORRIDOR_END - 6), target: v(0, portrait ? 4.2 : 3.2, BOOTH_Z) },
@@ -459,13 +475,22 @@ function Rig() {
   return null;
 }
 
-/** Drives every light and glowing material from the power switch and the beat. */
-function Lights() {
+const DOOR_LIGHT = v(0, 3.2, 2.2);
+const HALL_LIGHT = v(0, 7, -52);
+/** Where the key light sits when there is no backlight: behind the booth, so the crowd still reads as silhouettes. */
+const HALL_LIGHT_SOLO = v(0, 4.5, HALL_END + 3);
+
+/**
+ * Drives every light and glowing material from the power switch and the beat.
+ * Each live light is paid for on every pixel, so there are only two or three:
+ * one that travels with the camera, one "key" light that serves the doorway
+ * and later the hall, and (top tier only) a backlight behind the booth.
+ */
+function Lights({ tier }: { tier: Tier }) {
   const power = useRef(0);
   const ambient = useRef<THREE.AmbientLight>(null);
-  const door = useRef<THREE.PointLight>(null);
+  const key = useRef<THREE.PointLight>(null);
   const follow = useRef<THREE.PointLight>(null);
-  const hall = useRef<THREE.PointLight>(null);
   const back = useRef<THREE.PointLight>(null);
 
   useFrame(({ camera, clock }, delta) => {
@@ -485,27 +510,35 @@ function Lights() {
     barGlow.forEach((m, i) =>
       m.color.copy(NEON).multiplyScalar((0.5 + 2.6 * kick * (Math.floor(beat) % 3 === i ? 1 : 0.25)) * on),
     );
-    signGlow.forEach((m, i) => m.color.setScalar((2.1 + 0.15 * Math.sin(t * 23 + i * 2)) * on));
+    // Kept just above the glow threshold: any brighter and the halo swallows the letters on phones.
+    signGlow.forEach((m, i) => m.color.setScalar((1.3 + 0.08 * Math.sin(t * 23 + i * 2)) * on));
     laserGlow.opacity = 0.42 * on;
     dustMaterial.opacity = 0.55 * on;
 
     if (ambient.current) ambient.current.intensity = 0.05 + 0.2 * on;
-    if (door.current) door.current.intensity = 26 * on;
     if (follow.current) {
       follow.current.intensity = 16 * on;
       follow.current.position.set(camera.position.x, 3.4, camera.position.z - 2.5);
     }
-    if (hall.current) hall.current.intensity = (90 + 110 * kick) * on;
+    if (key.current) {
+      // Halfway down the corridor both spots are out of range, so the swap is invisible.
+      const atDoor = camera.position.z > -20;
+      const solo = !back.current;
+      key.current.position.copy(atDoor ? DOOR_LIGHT : solo ? HALL_LIGHT_SOLO : HALL_LIGHT);
+      key.current.distance = atDoor ? 22 : 34;
+      key.current.intensity = (atDoor ? 26 : (solo ? 190 : 90) + 110 * kick) * on;
+    }
     if (back.current) back.current.intensity = 160 * on;
   });
 
   return (
     <>
       <ambientLight ref={ambient} color={LIGHT} intensity={0.05} />
-      <pointLight ref={door} color={LIGHT} position={[0, 3.2, 2.2]} distance={22} intensity={0} />
+      <pointLight ref={key} color={LIGHT} intensity={0} />
       <pointLight ref={follow} color={LIGHT} distance={16} intensity={0} />
-      <pointLight ref={hall} color={LIGHT} position={[0, 7, -52]} distance={34} intensity={0} />
-      <pointLight ref={back} color={LIGHT} position={[0, 4, HALL_END + 2.5]} distance={30} intensity={0} />
+      {tier === 2 && (
+        <pointLight ref={back} color={LIGHT} position={[0, 4, HALL_END + 2.5]} distance={30} intensity={0} />
+      )}
     </>
   );
 }
@@ -526,37 +559,68 @@ function Dust() {
   );
 }
 
-function World() {
+function World({ tier }: { tier: Tier }) {
   const art = useArt();
+  const street = useRef<THREE.Group>(null);
+  const corridor = useRef<THREE.Group>(null);
+  const hall = useRef<THREE.Group>(null);
+
+  // The camera only ever faces forward, so whatever is behind it, or still
+  // lost in the haze far ahead, is skipped entirely.
+  useFrame(({ camera }) => {
+    const z = camera.position.z;
+    zone.street = z > -1.5;
+    zone.corridor = z > CORRIDOR_END - 1;
+    zone.hall = z < -4;
+    if (street.current) street.current.visible = zone.street;
+    if (corridor.current) corridor.current.visible = zone.corridor;
+    if (hall.current) hall.current.visible = zone.hall;
+  });
+
   return (
     <>
       <color attach="background" args={["#010302"]} />
       <fogExp2 attach="fog" args={["#020a03", 0.042]} />
-      <Lights />
+      <Lights tier={tier} />
       <Rig />
-      <Street />
-      <Corridor />
-      {art && <GenreSigns signs={art.signs} />}
-      <Hall art={art} />
+      <group ref={street}>
+        <Street />
+      </group>
+      <group ref={corridor}>
+        <Corridor />
+        {art && <GenreSigns signs={art.signs} />}
+      </group>
+      <group ref={hall} visible={false}>
+        <Hall art={art} crowd={CROWD_SIZE[tier]} />
+      </group>
       <Dust />
     </>
   );
 }
 
-export default function Scene() {
-  // Drop the glow pass and resolution on devices that cannot hold the frame rate.
-  const [lite, setLite] = useState(false);
+function startingTier(): Tier {
+  const touch = window.matchMedia("(pointer: coarse)").matches;
+  const cores = navigator.hardwareConcurrency ?? 8;
+  const memory = (navigator as { deviceMemory?: number }).deviceMemory ?? 8;
+  return touch || cores <= 4 || memory <= 4 ? 1 : 2;
+}
+
+/** `active` is false until the lights are switched on; until then one still frame is enough. */
+export default function Scene({ active }: { active: boolean }) {
+  const [tier, setTier] = useState<Tier>(startingTier);
   return (
     <Canvas
-      dpr={lite ? 1 : [1, 1.5]}
+      frameloop={active ? "always" : "demand"}
+      dpr={[1, MAX_DPR[tier]]}
       gl={{ antialias: false, powerPreference: "high-performance" }}
       camera={{ fov: 58, near: 0.1, far: 120, position: [0, 1.7, 9.5] }}
     >
-      <PerformanceMonitor onDecline={() => setLite(true)} />
-      <World />
-      {!lite && (
+      {/* Step down a tier whenever the device cannot hold its frame rate. */}
+      <PerformanceMonitor onDecline={() => setTier((t) => (t > 0 ? ((t - 1) as Tier) : t))} />
+      <World tier={tier} />
+      {tier > 0 && (
         <EffectComposer multisampling={0}>
-          <Bloom mipmapBlur intensity={1.15} luminanceThreshold={1} luminanceSmoothing={0.15} />
+          <Bloom mipmapBlur intensity={BLOOM[tier]} luminanceThreshold={1} luminanceSmoothing={0.15} />
           <Vignette offset={0.25} darkness={0.7} />
           <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
         </EffectComposer>

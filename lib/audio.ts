@@ -8,6 +8,12 @@ const STEP = 60 / BPM / 4;
 const ROOTS = [55, 55, 43.65, 49];
 const BASS_STEPS = new Set([2, 3, 6, 7, 10, 11, 14]);
 const LEVEL = 0.5;
+/**
+ * How far ahead notes are queued. Generous on purpose: switching the lights on
+ * and walking into the hall both make the page briefly busy, and a short queue
+ * would run dry and leave a hole in the beat.
+ */
+const LOOKAHEAD = 0.6;
 
 type Engine = {
   ctx: AudioContext;
@@ -19,6 +25,10 @@ type Engine = {
   origin: number;
   /** True once the loop has been given its start time. */
   begun: boolean;
+  /** Steps that were never played because the scheduler ran late. */
+  dropped: number;
+  /** Stops the timer, removes listeners and closes the audio context. */
+  dispose: () => void;
 };
 
 // Kept on globalThis so a hot reload in development reuses the one engine
@@ -76,8 +86,9 @@ function schedule(e: Engine) {
     const missed = Math.ceil((ctx.currentTime + 0.05 - e.nextTime) / STEP);
     e.nextTime += missed * STEP;
     e.step += missed;
+    e.dropped += missed;
   }
-  while (e.nextTime < ctx.currentTime + 0.15) {
+  while (e.nextTime < ctx.currentTime + LOOKAHEAD) {
     const s = e.step % 16;
     if (s % 4 === 0) kick(e, e.nextTime);
     if (s % 4 === 2) burst(e, e.nextTime, "highpass", 8000, 0.16, 0.05, e.filter);
@@ -96,7 +107,8 @@ function zap(e: Engine, t: number) {
   }
   const hum = ctx.createOscillator();
   hum.type = "sawtooth";
-  hum.frequency.value = 100;
+  // A2: in key with the bass line it plays over. A mains-style 100Hz hum clashed with it.
+  hum.frequency.value = 110;
   const g = ctx.createGain();
   g.gain.setValueAtTime(0.0001, t);
   g.gain.exponentialRampToValueAtTime(0.05, t + 0.7);
@@ -122,6 +134,10 @@ function build(): Engine | null {
     window.AudioContext ??
     (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AC) return null;
+  // iPhones mute web audio when the ring/silent switch is on silent unless the
+  // page declares itself as media playback, the way a music or video site does.
+  const session = (navigator as { audioSession?: { type: string } }).audioSession;
+  if (session) session.type = "playback";
   const ctx = new AC();
   const master = ctx.createGain();
   master.gain.value = state.muted ? 0 : LEVEL;
@@ -134,9 +150,12 @@ function build(): Engine | null {
   const noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate);
   const data = noise.getChannelData(0);
   for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
-  const e: Engine = { ctx, master, filter, noise, step: 0, nextTime: 0, origin: 0, begun: false };
+  const e: Engine = {
+    ctx, master, filter, noise, step: 0, nextTime: 0, origin: 0, begun: false, dropped: 0,
+    dispose: () => undefined,
+  };
 
-  window.setInterval(() => schedule(e), 40);
+  const timer = window.setInterval(() => schedule(e), 40);
 
   // Browsers can leave the context suspended (first load, returning to the
   // tab, a phone call). Any later tap or key press wakes it and, if the loop
@@ -146,12 +165,20 @@ function build(): Engine | null {
     if (ctx.state === "running") begin(e);
     else void ctx.resume().then(() => begin(e), () => undefined);
   };
-  window.addEventListener("pointerdown", wake);
-  window.addEventListener("keydown", wake);
-  document.addEventListener("visibilitychange", () => {
+  const onVisibility = () => {
     if (document.hidden) void ctx.suspend();
     else wake();
-  });
+  };
+  window.addEventListener("pointerdown", wake);
+  window.addEventListener("keydown", wake);
+  document.addEventListener("visibilitychange", onVisibility);
+  e.dispose = () => {
+    window.clearInterval(timer);
+    window.removeEventListener("pointerdown", wake);
+    window.removeEventListener("keydown", wake);
+    document.removeEventListener("visibilitychange", onVisibility);
+    void ctx.close().catch(() => undefined);
+  };
   return e;
 }
 
@@ -170,6 +197,16 @@ export async function startAudio() {
     }
   }
   begin(e);
+}
+
+/** Silences everything at once. The next startAudio() begins again from the top. */
+export function stopAudio() {
+  const e = state.engine;
+  state.engine = null;
+  if (!e) return;
+  // An engine left over from before a hot reload may predate dispose().
+  if (typeof e.dispose === "function") e.dispose();
+  else void e.ctx.close().catch(() => undefined);
 }
 
 export function setMuted(value: boolean) {
