@@ -3,15 +3,24 @@ import { Anton, Geist, Unbounded } from "next/font/google";
 import "./globals.css";
 
 const geist = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-// Tall, heavy poster lettering for the title and genre names.
+// Tall, heavy poster lettering for the title and lineup.
 const anton = Anton({ variable: "--font-anton", weight: "400", subsets: ["latin"] });
 // Wide caps for labels, matching "COMING SOON!!" on the poster.
 const unbounded = Unbounded({ variable: "--font-unbounded", subsets: ["latin"] });
 
+const title = "Neon Night | Brick City Rave";
+const description =
+  "Brick City goes green. Neon Night, a Bells University Students' Association rave with five artists still to be announced. Coming soon.";
+
 export const metadata: Metadata = {
-  title: "Neon Night | Brick City Rave",
-  description:
-    "Brick City goes green. Neon Night, a Bells University Students' Association rave: hip hop, rave, R&B, afrobeat and more. Coming soon.",
+  // Link previews need absolute image addresses; this is the live site they resolve against.
+  metadataBase: new URL("https://brickcityevent.site"),
+  title,
+  description,
+  // The preview picture and icons come from the image files next to this one
+  // (opengraph-image, twitter-image, icon, apple-icon, favicon).
+  openGraph: { title, description, url: "/", siteName: "Neon Night", type: "website", locale: "en_NG" },
+  twitter: { card: "summary_large_image", title, description },
 };
 
 export const viewport: Viewport = {

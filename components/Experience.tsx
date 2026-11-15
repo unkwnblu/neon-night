@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { setMuted, setOpenness, startAudio, stopAudio } from "@/lib/audio";
-import { BEAT_COUNT, EVENT, GENRES } from "@/lib/event";
+import { ARTISTS, BEAT_COUNT, DJS, EVENT, type Artist } from "@/lib/event";
 import { stage } from "@/lib/stage";
 
 // WebGL cannot render on the server, so the scene loads in the browser only.
@@ -16,6 +16,38 @@ function Beat({ active, className = "", children }: { active: boolean; className
     <section className={`beat ${active ? "on" : ""} ${className}`} aria-hidden={!active} inert={!active}>
       {children}
     </section>
+  );
+}
+
+/** A lineup slot: the artist's photo once announced, a neon "?" until then. */
+function ArtistTile({ artist }: { artist: Artist }) {
+  return (
+    <div className="artist-tile">
+      {artist.image ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={artist.image} alt={artist.name ?? "Artist"} />
+      ) : (
+        <span aria-label="Artist to be announced">?</span>
+      )}
+    </div>
+  );
+}
+
+/** A DJ on the dance-floor stop: portrait and name once announced, a neon "?" until then. */
+function DjCard({ dj, index }: { dj: Artist; index: number }) {
+  return (
+    <li className="dj-card">
+      <div className="dj-photo">
+        {dj.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={dj.image} alt={dj.name ?? "DJ"} />
+        ) : (
+          <span aria-hidden>?</span>
+        )}
+      </div>
+      <p className="eyebrow">DJ {String(index + 1).padStart(2, "0")}</p>
+      <p className="dj-name">{dj.name ?? "To be announced"}</p>
+    </li>
   );
 }
 
@@ -206,25 +238,29 @@ export default function Experience() {
         </h2>
       </Beat>
 
-      {GENRES.map((genre, i) => (
+      {ARTISTS.map((artist, i) => (
         <Beat
-          key={genre.name}
+          key={i}
           active={beat === i + 2}
-          // Text sits opposite the sign: signs alternate left, right, left, right.
+          // Text sits opposite the frame: frames alternate left, right, left, right.
           className={`justify-end max-md:items-center max-md:text-center md:justify-center ${
             i % 2 === 0 ? "md:items-end md:text-right" : "md:items-start"
           }`}
         >
           <p className="eyebrow">
-            Sound {String(i + 1).padStart(2, "0")} / {String(GENRES.length).padStart(2, "0")}
+            Artist {String(i + 1).padStart(2, "0")} / {String(ARTISTS.length).padStart(2, "0")}
           </p>
-          <h2 className="genre">{genre.name}</h2>
-          <p className="line">{genre.line}</p>
+          <h2 className="artist-name">{artist.name ?? "To be announced"}</h2>
         </Beat>
       ))}
 
       <Beat active={beat === LAST_BEAT - 1} className="items-center justify-end text-center">
-        <p className="eyebrow">&amp; more</p>
+        <ul className="djs" aria-label="DJs">
+          {DJS.map((dj, i) => (
+            <DjCard key={i} dj={dj} index={i} />
+          ))}
+        </ul>
+        <p className="eyebrow">On the decks</p>
         <h2 className="statement">
           One floor. <em>Every</em> sound.
         </h2>
@@ -259,11 +295,12 @@ export default function Experience() {
               </a>
             )}
           </div>
-          <ul className="genres" aria-label="Genres">
-            {GENRES.map((g) => (
-              <li key={g.name}>{g.name}</li>
+          <ul className="lineup" aria-label="Lineup">
+            {ARTISTS.map((a, i) => (
+              <li key={i}>
+                <ArtistTile artist={a} />
+              </li>
             ))}
-            <li>&amp; more</li>
           </ul>
           <p className="footnote">{EVENT.host}</p>
         </div>

@@ -7,15 +7,15 @@ import { ToneMappingMode } from "postprocessing";
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { beatClock, BPM } from "@/lib/audio";
-import { BEAT_COUNT, GENRES } from "@/lib/event";
+import { ARTISTS, BEAT_COUNT } from "@/lib/event";
 import { stage } from "@/lib/stage";
-import { brickCanvases, dotCanvas, plateCanvas, seeded, signCanvas } from "@/lib/textures";
+import { artistCanvas, brickCanvases, dotCanvas, plateCanvas, seeded, signCanvas } from "@/lib/textures";
 
 /*
  * World layout, walking in the -Z direction:
  *   z  > 0        the street outside the warehouse
  *   z  = 0        brick facade with the doorway
- *   0 to -40      brick corridor with neon hoops and the genre signs
+ *   0 to -40      brick corridor with neon hoops and the lineup frames
  *   -40 to -68    the hall: crowd, DJ booth, light wall
  */
 const CORRIDOR_END = -40;
@@ -23,8 +23,10 @@ const HALL_END = -68;
 const HALF_CORRIDOR = 2.5;
 const HALF_HALL = 11;
 const BOOTH_Z = -60.5;
-const HOOP_COUNT = 9;
-const SIGN_Z = GENRES.map((_, i) => -11 - i * 8);
+const SIGN_Z = ARTISTS.map((_, i) => -11 - i * 6);
+// One hoop at the entrance, one 3m in front of each frame (the camera stops just
+// inside it, so no tube crosses the frame) and one closing off the far end.
+const HOOP_Z = [-4, ...SIGN_Z.map((z) => z + 3), SIGN_Z[SIGN_Z.length - 1] - 3];
 /** Left wall first, then alternating. */
 const signSide = (i: number) => (i % 2 === 0 ? -1 : 1);
 
@@ -36,7 +38,7 @@ const LIGHT = new THREE.Color(0.4, 1, 0.28);
 const glowMaterial = () => new THREE.MeshBasicMaterial({ color: 0x000000, toneMapped: false });
 const doorGlow = glowMaterial();
 const trimGlow = glowMaterial();
-const hoopGlow = Array.from({ length: HOOP_COUNT }, glowMaterial);
+const hoopGlow = HOOP_Z.map(glowMaterial);
 const barGlow = [glowMaterial(), glowMaterial(), glowMaterial()];
 const signGlow: THREE.MeshBasicMaterial[] = [];
 const laserGlow = new THREE.MeshBasicMaterial({
@@ -163,9 +165,7 @@ function Corridor() {
       <BrickWall size={[length, height]} position={[-HALF_CORRIDOR, height / 2, mid]} rotationY={Math.PI / 2} />
       <BrickWall size={[length, height]} position={[HALF_CORRIDOR, height / 2, mid]} rotationY={-Math.PI / 2} />
       {hoopGlow.map((material, i) => {
-        // Spaced so each sign has one hoop 3m before it and one 1m behind it.
-        // The camera stops inside the nearer hoop, so no tube crosses the lettering.
-        const z = -4 - i * 4;
+        const z = HOOP_Z[i];
         return (
           <group key={i}>
             <Tube size={[0.06, height, 0.06]} position={[-HALF_CORRIDOR + 0.08, height / 2, z]} material={material} />
@@ -188,8 +188,8 @@ function useArt() {
     let cancelled = false;
     const family =
       getComputedStyle(document.documentElement).getPropertyValue("--font-anton").trim() || "Impact, sans-serif";
-    const sign = (text: string): SignArt => {
-      const { canvas, aspect } = signCanvas(text, family);
+    const sign = (text: string): SignArt => glow(signCanvas(text, family));
+    const glow = ({ canvas, aspect }: { canvas: HTMLCanvasElement; aspect: number }): SignArt => {
       const map = new THREE.CanvasTexture(canvas);
       map.colorSpace = THREE.SRGBColorSpace;
       map.anisotropy = 8;
@@ -204,15 +204,21 @@ function useArt() {
       signGlow.push(material);
       return { material, aspect };
     };
-    document.fonts
-      .load(`200px ${family}`)
-      .catch(() => undefined)
-      .then(() => {
+    const photo = (src: string | null) =>
+      new Promise<HTMLImageElement | null>((resolve) => {
+        if (!src) return resolve(null);
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = src;
+      });
+    Promise.all([document.fonts.load(`200px ${family}`).catch(() => undefined), ...ARTISTS.map((a) => photo(a.image))])
+      .then(([, ...photos]) => {
         if (cancelled) return;
         const plateMap = new THREE.CanvasTexture(plateCanvas(family));
         plateMap.colorSpace = THREE.SRGBColorSpace;
         setArt({
-          signs: GENRES.map((g) => sign(g.name.toUpperCase())),
+          signs: photos.map((p) => glow(artistCanvas(family, p as HTMLImageElement | null))),
           title: sign("NEON NIGHT"),
           plate: new THREE.MeshBasicMaterial({ map: plateMap, color: "#8a8a8a", transparent: true }),
         });
@@ -225,16 +231,17 @@ function useArt() {
   return art;
 }
 
-function GenreSigns({ signs }: { signs: SignArt[] }) {
+function ArtistSigns({ signs }: { signs: SignArt[] }) {
   return (
     <>
       {signs.map(({ material, aspect }, i) => {
         const side = signSide(i);
-        const height = 0.82;
+        // Big enough to show an artist photo; the corridor fits about 1.8m at this angle.
+        const height = 1.8;
         const width = Math.min(2.1, height * aspect);
         return (
           // Angled out from the wall to face people walking in.
-          <group key={i} position={[side * 1.55, 2.35, SIGN_Z[i]]} rotation-y={-side * 0.95}>
+          <group key={i} position={[side * 1.55, 2.4, SIGN_Z[i]]} rotation-y={-side * 0.95}>
             {/* Backing board, so tubes further down the corridor do not show through the letters */}
             <mesh position-z={-0.03} material={signBoard}>
               <planeGeometry args={[width + 0.1, width / aspect + 0.05]} />
@@ -588,7 +595,7 @@ function World({ tier }: { tier: Tier }) {
       </group>
       <group ref={corridor}>
         <Corridor />
-        {art && <GenreSigns signs={art.signs} />}
+        {art && <ArtistSigns signs={art.signs} />}
       </group>
       <group ref={hall} visible={false}>
         <Hall art={art} crowd={CROWD_SIZE[tier]} />

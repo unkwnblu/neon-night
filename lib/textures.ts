@@ -132,3 +132,51 @@ export function dotCanvas() {
   ctx.fillRect(0, 0, 32, 32);
   return c;
 }
+
+/**
+ * A square neon frame for a lineup slot: the artist's photo when there is one,
+ * otherwise a big glowing question mark.
+ */
+export function artistCanvas(family: string, photo?: HTMLImageElement | null) {
+  const S = 1024;
+  const INSET = 44;
+  const [c, ctx] = canvas(S, S);
+  const inner = S - INSET * 2;
+  if (photo) {
+    // Cover-crop the photo into the frame.
+    const scale = Math.max(inner / photo.width, inner / photo.height);
+    const w = photo.width * scale;
+    const h = photo.height * scale;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(INSET, INSET, inner, inner);
+    ctx.clip();
+    ctx.drawImage(photo, INSET + (inner - w) / 2, INSET + (inner - h) / 2, w, h);
+    ctx.restore();
+  } else {
+    ctx.font = `640px ${family}`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.lineJoin = "round";
+    ctx.shadowColor = "#39ff14";
+    ctx.shadowBlur = 16;
+    ctx.strokeStyle = "#4dff2a";
+    ctx.lineWidth = 16;
+    ctx.strokeText("?", S / 2, S / 2 + 24);
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = "#eaffe2";
+    ctx.lineWidth = 8;
+    ctx.strokeText("?", S / 2, S / 2 + 24);
+  }
+  ctx.lineJoin = "miter";
+  ctx.shadowColor = "#39ff14";
+  ctx.shadowBlur = 24;
+  ctx.strokeStyle = "#4dff2a";
+  ctx.lineWidth = 14;
+  ctx.strokeRect(INSET - 14, INSET - 14, inner + 28, inner + 28);
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = "#eaffe2";
+  ctx.lineWidth = 7;
+  ctx.strokeRect(INSET - 14, INSET - 14, inner + 28, inner + 28);
+  return { canvas: c, aspect: 1 };
+}

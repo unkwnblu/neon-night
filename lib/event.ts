@@ -11,12 +11,30 @@ export const EVENT = {
   instagramUrl: null as string | null,
 };
 
-export const GENRES = [
-  { name: "Hip Hop", line: "Bars heavy enough to shake the bricks." },
-  { name: "Rave", line: "Lasers up. Lights down. No brakes." },
-  { name: "R&B", line: "Slow it down and keep it glowing." },
-  { name: "Afrobeat", line: "The sound of home, turned all the way up." },
-] as const;
+/**
+ * Lineup slots. Each one shows as a "?" square until it is filled in.
+ * To reveal an artist, set `name` and put their photo in /public (e.g.
+ * "/artists/name.jpg"), then set `image` to that path. A square photo works best.
+ */
+export type Artist = { name: string | null; image: string | null };
 
-/** hero, intro, one per genre, the floor, landing */
-export const BEAT_COUNT = GENRES.length + 4;
+export const ARTISTS: Artist[] = [
+  { name: null, image: null },
+  { name: null, image: null },
+  { name: null, image: null },
+  { name: null, image: null },
+  { name: null, image: null },
+];
+
+/**
+ * The two DJs shown as cards on the dance-floor stop. They work the same way
+ * as the lineup slots: a "?" card until `name` and `image` are filled in.
+ * A portrait photo (taller than wide) fits the card best.
+ */
+export const DJS: Artist[] = [
+  { name: "DJ Remix", image: "/djs/dj-remix.jpg" },
+  { name: null, image: null },
+];
+
+/** hero, intro, one per artist, the floor, landing */
+export const BEAT_COUNT = ARTISTS.length + 4;
