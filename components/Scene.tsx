@@ -613,7 +613,7 @@ function startingTier(): Tier {
 }
 
 /** `active` is false until the lights are switched on; until then one still frame is enough. */
-export default function Scene({ active }: { active: boolean }) {
+export default function Scene({ active, onReady }: { active: boolean; onReady?: () => void }) {
   const [tier, setTier] = useState<Tier>(startingTier);
   return (
     <Canvas
@@ -621,6 +621,8 @@ export default function Scene({ active }: { active: boolean }) {
       dpr={[1, MAX_DPR[tier]]}
       gl={{ antialias: false, powerPreference: "high-performance" }}
       camera={{ fov: 58, near: 0.1, far: 120, position: [0, 1.7, 9.5] }}
+      // Fires once the renderer and scene exist, which is when the lights can come on.
+      onCreated={() => onReady?.()}
     >
       {/* Step down a tier whenever the device cannot hold its frame rate. */}
       <PerformanceMonitor onDecline={() => setTier((t) => (t > 0 ? ((t - 1) as Tier) : t))} />

@@ -2,12 +2,25 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
-import { setMuted, setOpenness, startAudio, stopAudio } from "@/lib/audio";
+import { armAudio, setMuted, setOpenness, startAudio, stopAudio } from "@/lib/audio";
 import { ARTISTS, BEAT_COUNT, DJS, EVENT, type Artist } from "@/lib/event";
 import { stage } from "@/lib/stage";
 
 // WebGL cannot render on the server, so the scene loads in the browser only.
 const Scene = dynamic(() => import("./Scene"), { ssr: false });
+
+/** The first sign that a real person is here; any of these starts loading the 3D scene. */
+const FIRST_TOUCH = ["pointermove", "pointerdown", "touchstart", "keydown", "wheel"] as const;
+/** Longest the light switch waits for the scene before carrying on without it. */
+const SCENE_WAIT = 2500;
+
+const sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
+
+function deferred() {
+  let resolve = () => {};
+  const promise = new Promise<void>((done) => (resolve = done));
+  return { promise, resolve };
+}
 
 const LAST_BEAT = BEAT_COUNT - 1;
 
@@ -20,10 +33,10 @@ function Beat({ active, className = "", children }: { active: boolean; className
 }
 
 /** A lineup slot: the artist's photo once announced, a neon "?" until then. */
-function ArtistTile({ artist }: { artist: Artist }) {
+function ArtistTile({ artist, show }: { artist: Artist; show: boolean }) {
   return (
     <div className="artist-tile">
-      {artist.image ? (
+      {artist.image && show ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={artist.image} alt={artist.name ?? "Artist"} />
       ) : (
@@ -34,11 +47,11 @@ function ArtistTile({ artist }: { artist: Artist }) {
 }
 
 /** A DJ on the dance-floor stop: portrait and name once announced, a neon "?" until then. */
-function DjCard({ dj, index }: { dj: Artist; index: number }) {
+function DjCard({ dj, index, show }: { dj: Artist; index: number; show: boolean }) {
   return (
     <li className="dj-card">
       <div className="dj-photo">
-        {dj.image ? (
+        {dj.image && show ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={dj.image} alt={dj.name ?? "DJ"} />
         ) : (
@@ -63,7 +76,7 @@ function Title({ lit }: { lit: boolean }) {
   );
 }
 
-function Countdown({ to }: { to: string }) {
+function Countdown({ to, label, done }: { to: string; label: string; done?: React.ReactNode }) {
   const [left, setLeft] = useState<number | null>(null);
   useEffect(() => {
     const tick = () => setLeft(Math.max(0, new Date(to).getTime() - Date.now()));
@@ -75,6 +88,7 @@ function Countdown({ to }: { to: string }) {
     };
   }, [to]);
 
+  if (left === 0 && done) return <>{done}</>;
   const s = Math.floor((left ?? 0) / 1000);
   const parts = [
     ["Days", Math.floor(s / 86400)],
@@ -83,7 +97,7 @@ function Countdown({ to }: { to: string }) {
     ["Secs", s % 60],
   ] as const;
   return (
-    <div className="countdown" role="timer" aria-label="Time until Neon Night">
+    <div className="countdown" role="timer" aria-label={label}>
       {parts.map(([label, value]) => (
         <div key={label}>
           <b>{left === null ? "--" : String(value).padStart(2, "0")}</b>
@@ -100,11 +114,31 @@ function formatDate(iso: string) {
   );
 }
 
+/** "Wed 18 Nov, 12 PM", always in Lagos time. */
+function formatDrop(iso: string) {
+  return new Intl.DateTimeFormat("en-NG", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: "Africa/Lagos",
+  })
+    .format(new Date(iso))
+    .replace(":00", "");
+}
+
 export default function Experience() {
   const [entered, setEntered] = useState(false);
   const [beat, setBeat] = useState(0);
   const [sound, setSound] = useState(true);
   const [copied, setCopied] = useState(false);
+  // The 3D scene is the heaviest thing on the page and the gate is dark anyway,
+  // so it is not downloaded or built until someone actually interacts.
+  const [sceneOn, setSceneOn] = useState(false);
+  const [sceneReady] = useState(deferred);
+  const [powering, setPowering] = useState(false);
   const bar = useRef<HTMLDivElement>(null);
   const entering = useRef(false);
   const scene = useRef<HTMLDivElement>(null);
@@ -125,6 +159,13 @@ export default function Experience() {
       document.documentElement.style.overflow = "";
     };
   }, [entered]);
+
+  useEffect(() => {
+    if (sceneOn) return;
+    const start = () => setSceneOn(true);
+    FIRST_TOUCH.forEach((type) => window.addEventListener(type, start, { passive: true }));
+    return () => FIRST_TOUCH.forEach((type) => window.removeEventListener(type, start));
+  }, [sceneOn]);
 
   useEffect(() => {
     const onScroll = () => {
@@ -152,9 +193,17 @@ export default function Experience() {
   const enter = async () => {
     if (entering.current) return;
     entering.current = true;
+    // Audio has to be woken inside the tap itself; it stays silent for now.
+    const armed = armAudio();
+    setSceneOn(true);
+    setPowering(true);
+    // Usually the scene is already up from the visitor's first mouse move or
+    // touch. If this tap is that first touch, give it a moment to arrive so the
+    // wall lights with the sign, but never leave the visitor waiting on it.
+    await Promise.race([Promise.all([armed, sceneReady.promise]), sleep(SCENE_WAIT)]);
     // Wait for sound to really be running so the tubes and the first kick land
     // together, but never keep the lights waiting if audio is blocked.
-    await Promise.race([startAudio(), new Promise((done) => setTimeout(done, 350))]);
+    await Promise.race([startAudio(), sleep(350)]);
     stage.power = 1;
     setEntered(true);
   };
@@ -186,7 +235,7 @@ export default function Experience() {
   return (
     <main>
       <div ref={scene} className="scene" aria-hidden>
-        <Scene active={entered} />
+        {sceneOn && <Scene active={entered} onReady={sceneReady.resolve} />}
       </div>
 
       {/* Scrolling this empty track is what walks the camera through the building. */}
@@ -194,10 +243,15 @@ export default function Experience() {
 
       <header className={`topbar ${entered ? "on" : ""}`}>
         <div className="brand">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logos/bells-university.png" alt="Bells University of Technology" width={320} height={305} />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logos/busa.png" alt="Bells University Students' Association" width={284} height={320} />
+          {/* The bar is hidden until the lights are on, so the logos are not fetched before then. */}
+          {entered && (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logos/bells-university.png" alt="Bells University of Technology" width={132} height={126} />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logos/busa.png" alt="Bells University Students' Association" width={117} height={132} />
+            </>
+          )}
           <span className="host">{EVENT.host}</span>
         </div>
         <div className="flex items-center gap-2">
@@ -231,8 +285,8 @@ export default function Experience() {
           </div>
         ) : (
           <div className="mt-8 flex flex-col items-center gap-4">
-            <button type="button" className="switch" onClick={enter}>
-              Switch on the lights
+            <button type="button" className="switch" onClick={enter} disabled={powering} aria-busy={powering}>
+              {powering ? "Powering up…" : "Switch on the lights"}
             </button>
             <p className="hint">Sound on</p>
           </div>
@@ -267,7 +321,7 @@ export default function Experience() {
       <Beat active={beat === LAST_BEAT - 1} className="items-center justify-end text-center">
         <ul className="djs" aria-label="DJs">
           {DJS.map((dj, i) => (
-            <DjCard key={i} dj={dj} index={i} />
+            <DjCard key={i} dj={dj} index={i} show={entered} />
           ))}
         </ul>
         <p className="eyebrow">On the decks</p>
@@ -285,7 +339,16 @@ export default function Experience() {
           {EVENT.date ? (
             <>
               {EVENT.venue && <p className="line">{EVENT.venue}</p>}
-              <Countdown to={EVENT.date} />
+              <Countdown to={EVENT.date} label="Time until Neon Night" />
+            </>
+          ) : EVENT.ticketsDrop && !EVENT.ticketsUrl ? (
+            <>
+              <p className="eyebrow mt-5">Tickets drop {formatDrop(EVENT.ticketsDrop)}</p>
+              <Countdown
+                to={EVENT.ticketsDrop}
+                label="Time until tickets drop"
+                done={<p className="line">Tickets are out now.</p>}
+              />
             </>
           ) : (
             <p className="line">Date, venue and tickets drop soon.</p>
@@ -308,7 +371,7 @@ export default function Experience() {
           <ul className="lineup" aria-label="Lineup">
             {ARTISTS.map((a, i) => (
               <li key={i}>
-                <ArtistTile artist={a} />
+                <ArtistTile artist={a} show={entered} />
               </li>
             ))}
           </ul>

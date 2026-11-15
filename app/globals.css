@@ -359,6 +359,11 @@ body {
   box-shadow: 0 0 44px rgb(57 255 20 / 0.7);
 }
 
+.switch:disabled {
+  cursor: progress;
+  animation-duration: 0.7s;
+}
+
 .switch:active {
   transform: scale(0.97);
 }

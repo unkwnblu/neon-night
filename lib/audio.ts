@@ -25,6 +25,8 @@ type Engine = {
   origin: number;
   /** True once the loop has been given its start time. */
   begun: boolean;
+  /** True while the engine is awake but told not to play yet. */
+  held: boolean;
   /** Steps that were never played because the scheduler ran late. */
   dropped: number;
   /** Stops the timer, removes listeners and closes the audio context. */
@@ -120,7 +122,7 @@ function zap(e: Engine, t: number) {
 
 /** Starts the crackle and the first kick together, timed off the audio clock. */
 function begin(e: Engine) {
-  if (e.begun || e.ctx.state !== "running") return;
+  if (e.held || e.begun || e.ctx.state !== "running") return;
   e.begun = true;
   // A short lead so nothing is clipped while the output device wakes up.
   const t = e.ctx.currentTime + 0.06;
@@ -151,7 +153,7 @@ function build(): Engine | null {
   const data = noise.getChannelData(0);
   for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
   const e: Engine = {
-    ctx, master, filter, noise, step: 0, nextTime: 0, origin: 0, begun: false, dropped: 0,
+    ctx, master, filter, noise, step: 0, nextTime: 0, origin: 0, begun: false, held: false, dropped: 0,
     dispose: () => undefined,
   };
 
@@ -182,20 +184,35 @@ function build(): Engine | null {
   return e;
 }
 
+async function wake(e: Engine) {
+  if (e.ctx.state === "running") return;
+  try {
+    await e.ctx.resume();
+  } catch {
+    // Still blocked; the wake listeners will retry on the next interaction.
+  }
+}
+
 /**
- * Call from a tap or click, or the browser will block it. Resolves once sound
- * is actually running, so the caller can fire visuals on the same moment.
+ * Call from the tap itself. Browsers only let audio start inside a tap, so this
+ * wakes the engine there and holds it silent until startAudio() is called.
+ */
+export async function armAudio() {
+  const e = state.engine ?? (state.engine = build());
+  if (!e) return;
+  e.held = true;
+  await wake(e);
+}
+
+/**
+ * Starts the music. Resolves once sound is actually running, so the caller can
+ * fire visuals on the same moment. Needs a tap, or an earlier armAudio() in one.
  */
 export async function startAudio() {
   const e = state.engine ?? (state.engine = build());
   if (!e) return;
-  if (e.ctx.state !== "running") {
-    try {
-      await e.ctx.resume();
-    } catch {
-      // Still blocked; the wake listeners will retry on the next interaction.
-    }
-  }
+  e.held = false;
+  await wake(e);
   begin(e);
 }
 

@@ -7,6 +7,8 @@ export const EVENT = {
   /** ISO date-time, e.g. "2026-12-05T20:00:00+01:00". Shows the countdown when set. */
   date: null as string | null,
   venue: null as string | null,
+  /** When tickets go on sale (Lagos time). Shows a countdown on the last screen until then. */
+  ticketsDrop: "2026-11-18T12:00:00+01:00" as string | null,
   ticketsUrl: null as string | null,
   instagramUrl: null as string | null,
 };
