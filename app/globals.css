@@ -452,6 +452,24 @@ body {
   visibility: visible;
 }
 
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.brand img {
+  width: auto;
+  height: 2.75rem;
+  flex: none;
+  filter: drop-shadow(0 1px 8px rgb(0 0 0 / 0.7));
+}
+
+.brand .host {
+  margin-left: 0.25rem;
+}
+
 .host {
   max-width: 22ch;
   line-height: 1.5;
@@ -460,6 +478,14 @@ body {
 }
 
 @media (max-width: 480px) {
+  .brand {
+    gap: 0.3rem;
+  }
+
+  .brand img {
+    height: 2rem;
+  }
+
   .host {
     max-width: 13ch;
     font-size: 0.5rem;
@@ -470,6 +496,47 @@ body {
     padding: 0 0.75rem;
     letter-spacing: 0.12em;
   }
+}
+
+/* The narrowest phones have no room for logos and text side by side. */
+@media (max-width: 360px) {
+  .brand {
+    flex-wrap: wrap;
+    max-width: 6rem;
+  }
+
+  .brand .host {
+    margin-left: 0;
+  }
+}
+
+/* Quiet developer credit, pinned to the bottom-right corner on every stop. */
+.credit {
+  position: fixed;
+  /* The padding is invisible but makes the link big enough to tap on a phone. */
+  right: clamp(0.15rem, 1.4vw, 0.9rem);
+  bottom: 0;
+  padding: 0.75rem 0.6rem 0.6rem;
+  z-index: 20;
+  font-family: var(--font-unbounded), sans-serif;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgb(241 255 236 / 0.6);
+  text-shadow: 0 1px 6px #000;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.credit:hover,
+.credit:focus-visible {
+  color: var(--neon);
+}
+
+.credit:focus-visible {
+  outline: 2px solid var(--paper);
+  outline-offset: 3px;
 }
 
 .progress {

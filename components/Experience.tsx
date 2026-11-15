@@ -193,7 +193,13 @@ export default function Experience() {
       <div className="track" style={{ "--beats": LAST_BEAT } as React.CSSProperties} />
 
       <header className={`topbar ${entered ? "on" : ""}`}>
-        <span className="host">{EVENT.host}</span>
+        <div className="brand">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logos/bells-university.png" alt="Bells University of Technology" width={320} height={305} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logos/busa.png" alt="Bells University Students' Association" width={284} height={320} />
+          <span className="host">{EVENT.host}</span>
+        </div>
         <div className="flex items-center gap-2">
           <button type="button" className="chip" onClick={toggleSound} aria-pressed={sound}>
             <span className={`eq ${sound ? "playing" : ""}`} aria-hidden>
@@ -209,6 +215,10 @@ export default function Experience() {
         </div>
         <div ref={bar} className="progress" />
       </header>
+
+      <a className="credit" href="https://bludevs.site" target="_blank" rel="noopener">
+        Developed by BluDevs
+      </a>
 
       <Beat active={beat === 0} className="items-center justify-center text-center">
         <p className="eyebrow">{EVENT.host} presents</p>
