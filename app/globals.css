@@ -330,6 +330,35 @@ body {
   line-height: 1;
 }
 
+/* The event date is longer than "Coming soon!!", so it gets a smaller size. */
+.soon-date {
+  margin-top: 0.6rem;
+  font-size: clamp(1.5rem, 4.6vw, 3.4rem);
+  line-height: 1.1;
+  text-wrap: balance;
+}
+
+/* Opening screen: sits under the big title, so a size down. */
+.soon-date-sm {
+  margin-top: 0;
+  font-size: clamp(1.3rem, 3.4vw, 2.4rem);
+}
+
+.soon-date span {
+  white-space: nowrap;
+}
+
+.soon-time {
+  color: var(--neon);
+  text-shadow: 0 0 18px rgb(57 255 20 / 0.7), 0 2px 24px #000;
+}
+
+/* Venue names are long: a wider line, broken into even halves when it has to wrap. */
+.line.venue {
+  max-width: 44ch;
+  text-wrap: balance;
+}
+
 /* ---------- Controls ---------- */
 
 .switch {

@@ -3,7 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { armAudio, setMuted, setOpenness, startAudio, stopAudio } from "@/lib/audio";
-import { ARTISTS, BEAT_COUNT, DJS, EVENT, eventStartIso, eventWhen, type Artist } from "@/lib/event";
+import { ARTISTS, BEAT_COUNT, DJS, EVENT, eventDay, eventStartIso, eventTime, type Artist } from "@/lib/event";
 import { formatLagos, formatNaira, tierStatus, type PublicTier } from "@/lib/ticket-types";
 import { stage } from "@/lib/stage";
 
@@ -62,6 +62,29 @@ function DjCard({ dj, index, show }: { dj: Artist; index: number; show: boolean 
       <p className="eyebrow">DJ {String(index + 1).padStart(2, "0")}</p>
       <p className="dj-name">{dj.name ?? "To be announced"}</p>
     </li>
+  );
+}
+
+/** Date, time and venue once they're set in lib/event.ts; "Coming soon!!" until then. */
+function EventWhenWhere({ big = false }: { big?: boolean }) {
+  const day = eventDay("short");
+  const time = eventTime();
+  if (!day) return <h2 className={`soon ${big ? "soon-big" : ""}`}>Coming soon!!</h2>;
+  return (
+    <>
+      {/* Day and time each stay in one piece; a narrow screen breaks only between them. */}
+      <h2 className={`soon soon-date ${big ? "" : "soon-date-sm"}`}>
+        <span>{day}</span>
+        {time && (
+          <>
+            {" "}
+            <span className="soon-time">· {time}</span>
+          </>
+        )}
+      </h2>
+      {/* Initials stay with the next word ("O.\u00a0Ojediran"), so a wrap never splits a name. */}
+      {EVENT.venue && <p className="line venue">{EVENT.venue.replace(/\b([A-Z]\.) /g, "$1\u00a0")}</p>}
+    </>
   );
 }
 
@@ -310,7 +333,7 @@ export default function Experience({ tiers = [] }: { tiers?: PublicTier[] }) {
         <Title lit={entered} />
         {entered ? (
           <div className="mt-8 flex flex-col items-center gap-3">
-            <p className="soon">Coming soon!!</p>
+            <EventWhenWhere />
             <p className="hint">Scroll to enter</p>
             <span className="scroll-line" aria-hidden />
           </div>
@@ -366,8 +389,7 @@ export default function Experience({ tiers = [] }: { tiers?: PublicTier[] }) {
           <p className="eyebrow">
             {EVENT.series} · {EVENT.name}
           </p>
-          <h2 className="soon soon-big">{eventWhen("short") ?? "Coming soon!!"}</h2>
-          {EVENT.venue && <p className="line">{EVENT.venue}</p>}
+          <EventWhenWhere big />
           {ticketsDrop && !EVENT.ticketsUrl ? (
             <>
               <p className="eyebrow mt-5">Tickets drop {formatLagos(ticketsDrop)}</p>

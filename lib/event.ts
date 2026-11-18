@@ -8,7 +8,7 @@ export const EVENT = {
   date: "2026-12-12" as string | null,
   /** Doors / start time in Lagos, 24-hour "HH:MM" (e.g. "20:00"), or null until announced. */
   startTime: "17:00" as string | null,
-  venue: "Professor Jeremiah O. Ojediran Hall ( Marquee )" as string | null,
+  venue: "Professor Jeremiah O. Ojediran Hall (Marquee)" as string | null,
   /** When tickets go on sale (Lagos time). Shows a countdown on the last screen until then. */
   ticketsDrop: "2026-11-18T12:00:00+01:00" as string | null,
   ticketsUrl: null as string | null,
@@ -48,17 +48,29 @@ export function eventStartIso() {
   return EVENT.date ? `${EVENT.date}T${EVENT.startTime ?? "00:00"}:00+01:00` : null;
 }
 
-/** "Saturday, 12 December 2026" (plus ", 8 pm" once a start time is set), or null. */
-export function eventWhen(style: "long" | "short" = "long") {
+/** "Saturday, 12 December 2026" ("Sat, 12 Dec 2026" when short), without the time. */
+export function eventDay(style: "long" | "short" = "long") {
   if (!EVENT.date) return null;
-  const day = new Intl.DateTimeFormat("en-NG", {
+  return new Intl.DateTimeFormat("en-NG", {
     weekday: style,
     day: "numeric",
     month: style,
     year: "numeric",
     timeZone: "UTC",
   }).format(new Date(`${EVENT.date}T00:00:00Z`));
-  if (!EVENT.startTime) return day;
+}
+
+/** "5 pm" / "8:30 pm" from startTime, or null. */
+export function eventTime() {
+  if (!EVENT.startTime) return null;
   const [h, m] = EVENT.startTime.split(":").map(Number);
-  return `${day}, ${h % 12 || 12}${m ? `:${String(m).padStart(2, "0")}` : ""} ${h < 12 ? "am" : "pm"}`;
+  return `${h % 12 || 12}${m ? `:${String(m).padStart(2, "0")}` : ""} ${h < 12 ? "am" : "pm"}`;
+}
+
+/** "Saturday, 12 December 2026, 5 pm" (or without the time until it's set), or null. */
+export function eventWhen(style: "long" | "short" = "long") {
+  const day = eventDay(style);
+  if (!day) return null;
+  const time = eventTime();
+  return time ? `${day}, ${time}` : day;
 }
