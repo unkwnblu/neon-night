@@ -10,7 +10,7 @@ const unbounded = Unbounded({ variable: "--font-unbounded", subsets: ["latin"] }
 
 const title = "Neon Night | Brick City Rave";
 const description =
-  "Brick City goes green. Neon Night, a Bells University Students' Association rave with five artists still to be announced. Coming soon.";
+  "Brick City goes green. Neon Night, a Bells University Students' Association rave on Saturday 12 December 2026 from 5pm at Professor Jeremiah O. Ojediran. Five artists to be announced.";
 
 export const metadata: Metadata = {
   // Link previews need absolute image addresses; this is the live site they resolve against.

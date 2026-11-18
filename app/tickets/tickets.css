@@ -1,0 +1,355 @@
+/* Ticket checkout: the public site's neon look, laid out as a plain form. */
+
+.tk {
+  min-height: 100vh;
+  padding: clamp(1.25rem, 5vw, 3.5rem) 16px 4rem;
+  background:
+    radial-gradient(90% 60% at 50% 0%, rgb(57 255 20 / 0.12), transparent 65%),
+    var(--ink);
+}
+
+.tk-main {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+  max-width: 34rem;
+  margin: 0 auto;
+}
+
+.tk-back {
+  align-self: flex-start;
+  font-family: var(--font-unbounded), sans-serif;
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tk-back:hover {
+  color: var(--neon);
+}
+
+.tk-kicker {
+  font-family: var(--font-unbounded), sans-serif;
+  font-size: 0.62rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--neon-soft);
+  text-shadow: 0 0 14px rgb(57 255 20 / 0.5);
+}
+
+.tk h1 {
+  margin-top: 0.4rem;
+  font-family: var(--font-anton), Impact, sans-serif;
+  font-size: clamp(3rem, 12vw, 4.6rem);
+  font-weight: 400;
+  line-height: 0.95;
+  text-transform: uppercase;
+}
+
+.tk-note {
+  color: #d6e6d1;
+  line-height: 1.55;
+}
+
+.tk-note a {
+  color: var(--neon);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ---------- Form ---------- */
+
+.tk-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.4rem;
+}
+
+.tk-tiers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.tk-tiers legend,
+.tk-qty > span,
+.tk-field > span {
+  margin-bottom: 0.55rem;
+  font-family: var(--font-unbounded), sans-serif;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tk-tier {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.1rem;
+  border: 1px solid rgb(57 255 20 / 0.25);
+  background: rgb(0 0 0 / 0.55);
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, background-color 0.15s;
+}
+
+.tk-tier:hover {
+  border-color: rgb(57 255 20 / 0.6);
+}
+
+.tk-tier:has(input:checked) {
+  border-color: var(--neon);
+  background: rgb(57 255 20 / 0.07);
+  box-shadow: 0 0 0 1px var(--neon), 0 0 26px rgb(57 255 20 / 0.25), inset 0 0 20px rgb(57 255 20 / 0.08);
+}
+
+.tk-tier:has(input:focus-visible) {
+  outline: 2px solid var(--paper);
+  outline-offset: 3px;
+}
+
+.tk-tier[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tk-tier input {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--neon);
+}
+
+.tk-tier-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.tk-tier-name {
+  font-family: var(--font-anton), Impact, sans-serif;
+  font-size: 1.35rem;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.tk-tier-perk {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--neon);
+  text-shadow: 0 0 10px rgb(57 255 20 / 0.5);
+}
+
+.tk-tier-state {
+  min-height: 1.1em;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.tk-tier-price {
+  font-family: var(--font-anton), Impact, sans-serif;
+  font-size: 1.7rem;
+  white-space: nowrap;
+}
+
+.tk-qty {
+  display: flex;
+  flex-direction: column;
+}
+
+.tk-stepper {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  border: 1px solid rgb(57 255 20 / 0.35);
+  background: rgb(0 0 0 / 0.55);
+}
+
+.tk-stepper button {
+  width: 48px;
+  height: 48px;
+  color: var(--neon);
+  font-size: 1.4rem;
+  cursor: pointer;
+}
+
+.tk-stepper button:disabled {
+  color: var(--muted);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tk-stepper button:focus-visible {
+  outline: 2px solid var(--paper);
+  outline-offset: -2px;
+}
+
+.tk-stepper output {
+  min-width: 3rem;
+  font-family: var(--font-anton), Impact, sans-serif;
+  font-size: 1.5rem;
+  text-align: center;
+}
+
+.tk-fields {
+  display: grid;
+  gap: 1rem;
+}
+
+.tk-field {
+  display: flex;
+  flex-direction: column;
+}
+
+.tk-field input {
+  height: 50px;
+  padding: 0 0.95rem;
+  border: 1px solid rgb(255 255 255 / 0.18);
+  background: rgb(0 0 0 / 0.6);
+  color: var(--paper);
+  font: inherit;
+  font-size: 1rem;
+}
+
+.tk-field input:focus {
+  border-color: var(--neon);
+  box-shadow: 0 0 0 3px rgb(57 255 20 / 0.18);
+  outline: none;
+}
+
+.tk-error {
+  margin-top: 0.35rem;
+  font-size: 0.82rem;
+  color: #ff8a8a;
+}
+
+.tk-error-box {
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgb(255 138 138 / 0.35);
+  background: rgb(255 138 138 / 0.07);
+}
+
+.tk-pay {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid rgb(57 255 20 / 0.2);
+}
+
+.tk-pay span {
+  display: block;
+  font-family: var(--font-unbounded), sans-serif;
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tk-pay b {
+  font-family: var(--font-anton), Impact, sans-serif;
+  font-size: 2.2rem;
+  font-weight: 400;
+  line-height: 1.05;
+}
+
+.tk-pay .switch:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  animation: none;
+}
+
+.tk-fine {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+/* ---------- Result page ---------- */
+
+.tk-result {
+  padding-top: 8vh;
+}
+
+.tk-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: clamp(1.25rem, 5vw, 2rem);
+  border: 1px solid rgb(57 255 20 / 0.35);
+  background: rgb(0 0 0 / 0.6);
+  box-shadow: 0 0 40px rgb(57 255 20 / 0.12), inset 0 0 30px rgb(57 255 20 / 0.06);
+}
+
+.tk-card h1 {
+  font-size: clamp(2.4rem, 10vw, 3.6rem);
+}
+
+.tk-what {
+  font-family: var(--font-unbounded), sans-serif;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--neon);
+}
+
+/* ---------- Single ticket (/t/<code>) ---------- */
+
+.tk-ticket {
+  align-items: center;
+  text-align: center;
+}
+
+.tk-qr {
+  width: min(280px, 100%);
+  margin: 0.5rem auto 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 0 34px rgb(57 255 20 / 0.35);
+}
+
+.tk-qr svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.tk-code {
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.tk-ticket.is-void .tk-qr {
+  opacity: 0.25;
+  box-shadow: none;
+}
+
+.tk-ticket.is-void .tk-kicker {
+  color: #ff8a8a;
+  text-shadow: none;
+}
+
+/* "Check your spam" box on the after-payment page. */
+.tk-tip {
+  padding: 0.85rem 1rem;
+  border: 1px solid rgb(255 214 107 / 0.4);
+  background: rgb(255 214 107 / 0.07);
+  color: #f3e6c4;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.tk-tip b {
+  color: #ffd66b;
+}

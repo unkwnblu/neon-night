@@ -3,7 +3,8 @@
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { armAudio, setMuted, setOpenness, startAudio, stopAudio } from "@/lib/audio";
-import { ARTISTS, BEAT_COUNT, DJS, EVENT, type Artist } from "@/lib/event";
+import { ARTISTS, BEAT_COUNT, DJS, EVENT, eventStartIso, eventWhen, type Artist } from "@/lib/event";
+import { formatLagos, formatNaira, tierStatus, type PublicTier } from "@/lib/ticket-types";
 import { stage } from "@/lib/stage";
 
 // WebGL cannot render on the server, so the scene loads in the browser only.
@@ -108,28 +109,58 @@ function Countdown({ to, label, done }: { to: string; label: string; done?: Reac
   );
 }
 
-function formatDate(iso: string) {
-  return new Intl.DateTimeFormat("en-NG", { weekday: "short", day: "numeric", month: "short", year: "numeric" }).format(
-    new Date(iso),
+/** Current time, ticking every few seconds once mounted (null on the server, to avoid hydration mismatches). */
+function useNow(everyMs = 5000) {
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    const tick = () => setNow(Date.now());
+    const first = setTimeout(tick, 0);
+    const timer = setInterval(tick, everyMs);
+    return () => {
+      clearTimeout(first);
+      clearInterval(timer);
+    };
+  }, [everyMs]);
+  return now;
+}
+
+/** Ticket tiers and prices, as set in /admin. */
+function TierList({ tiers }: { tiers: PublicTier[] }) {
+  const now = useNow();
+  return (
+    <ul className="tiers" aria-label="Ticket prices">
+      {tiers.map((t) => {
+        const status = now === null ? null : tierStatus(t, now);
+        const soldOut = t.remaining === 0;
+        return (
+          <li key={t.id} className={status === "ended" || soldOut ? "tier-ended" : undefined}>
+            <span className="tier-name">{t.name}</span>
+            <b className="tier-price">{formatNaira(t.priceNaira)}</b>
+            {t.description && <span className="tier-perk">{t.description}</span>}
+            <span className="tier-when">
+              {soldOut
+                ? "Sold out"
+                : status === "on-sale"
+                ? t.remaining <= 5
+                  ? `Only ${t.remaining} left`
+                  : "On sale now"
+                : status === "ended"
+                  ? "Sales closed"
+                  : `From ${formatLagos(t.salesStart)}`}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
 
-/** "Wed 18 Nov, 12 PM", always in Lagos time. */
-function formatDrop(iso: string) {
-  return new Intl.DateTimeFormat("en-NG", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-    timeZone: "Africa/Lagos",
-  })
-    .format(new Date(iso))
-    .replace(":00", "");
-}
-
-export default function Experience() {
+export default function Experience({ tiers = [] }: { tiers?: PublicTier[] }) {
+  // The earliest visible tier from /admin decides when tickets drop; lib/event.ts is the fallback.
+  const ticketsDrop = tiers.length ? tiers.map((t) => t.salesStart).sort()[0] : EVENT.ticketsDrop;
+  const eventStart = eventStartIso();
+  // Our own checkout once tiers exist in /admin; an external ticketsUrl in lib/event.ts still wins if set.
+  const ticketsLink = EVENT.ticketsUrl ?? (tiers.length ? "/tickets" : null);
   const [entered, setEntered] = useState(false);
   const [beat, setBeat] = useState(0);
   const [sound, setSound] = useState(true);
@@ -335,31 +366,39 @@ export default function Experience() {
           <p className="eyebrow">
             {EVENT.series} · {EVENT.name}
           </p>
-          <h2 className="soon soon-big">{EVENT.date ? formatDate(EVENT.date) : "Coming soon!!"}</h2>
-          {EVENT.date ? (
+          <h2 className="soon soon-big">{eventWhen("short") ?? "Coming soon!!"}</h2>
+          {EVENT.venue && <p className="line">{EVENT.venue}</p>}
+          {ticketsDrop && !EVENT.ticketsUrl ? (
             <>
-              {EVENT.venue && <p className="line">{EVENT.venue}</p>}
-              <Countdown to={EVENT.date} label="Time until Neon Night" />
-            </>
-          ) : EVENT.ticketsDrop && !EVENT.ticketsUrl ? (
-            <>
-              <p className="eyebrow mt-5">Tickets drop {formatDrop(EVENT.ticketsDrop)}</p>
+              <p className="eyebrow mt-5">Tickets drop {formatLagos(ticketsDrop)}</p>
               <Countdown
-                to={EVENT.ticketsDrop}
+                to={ticketsDrop}
                 label="Time until tickets drop"
-                done={<p className="line">Tickets are out now.</p>}
+                done={
+                  eventStart ? (
+                    <>
+                      <p className="eyebrow mt-5">Tickets are out now · Counting down to the night</p>
+                      <Countdown to={eventStart} label="Time until Neon Night" />
+                    </>
+                  ) : (
+                    <p className="line">Tickets are out now.</p>
+                  )
+                }
               />
             </>
+          ) : eventStart ? (
+            <Countdown to={eventStart} label="Time until Neon Night" />
           ) : (
             <p className="line">Date, venue and tickets drop soon.</p>
           )}
+          {tiers.length > 0 && <TierList tiers={tiers} />}
           <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
-            {EVENT.ticketsUrl && (
-              <a className="switch" href={EVENT.ticketsUrl} target="_blank" rel="noreferrer">
+            {ticketsLink && (
+              <a className="switch" href={ticketsLink}>
                 Get tickets
               </a>
             )}
-            <button type="button" className={EVENT.ticketsUrl ? "chip chip-lg" : "switch"} onClick={share}>
+            <button type="button" className={ticketsLink ? "chip chip-lg" : "switch"} onClick={share}>
               {copied ? "Link copied" : "Tell your crew"}
             </button>
             {EVENT.instagramUrl && (
