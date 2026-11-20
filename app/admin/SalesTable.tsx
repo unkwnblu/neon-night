@@ -100,6 +100,7 @@ export function SalesTable({ sales }: { sales: Sale[] }) {
                 </td>
                 <td>
                   <span className="ad-cell-main">{s.tierName}</span>
+                  {s.publicity && <span className="ad-pill ad-pill-publicity">Publicity</span>}
                   {s.note && <small>{s.note}</small>}
                 </td>
                 <td className="num">{s.quantity}</td>

@@ -142,6 +142,9 @@ export type Sale = {
   emailed: boolean;
   /** Last email failure, if the latest attempt failed. */
   emailError: string | null;
+  /** Owner-only: moved to the publicity fund. Only ever true in data the owner receives. */
+  publicity: boolean;
+  publicityNote: string | null;
 };
 
 export type SaleInput = {

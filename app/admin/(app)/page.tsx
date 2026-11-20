@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { getDashboard } from "@/lib/sales";
-import { formatLagos, formatNaira, PAYMENT_METHODS, tierStatus } from "@/lib/ticket-types";
+import { formatLagos, formatNaira, PAYMENT_METHODS } from "@/lib/ticket-types";
 import { DailyChart } from "../ui/DailyChart";
 import { IconBox, IconTicket, IconUsers, IconWallet } from "../ui/Icons";
 import { LaunchCountdown } from "../ui/LaunchCountdown";
 import { Card, PageHeader, PageSkeleton } from "../ui/PageHeader";
 import { RecordSale } from "../ui/RecordSale";
-import { checkSetup } from "../ui/setup";
+import { checkSetup, viewerIsOwner } from "../ui/setup";
 
 export default function OverviewPage() {
   return (
@@ -23,7 +23,8 @@ async function Overview() {
   const notice = await checkSetup();
   if (notice) return notice;
 
-  const { tiers, sales, totals, byMethod, daily, loadedAt: now } = await getDashboard();
+  const owner = await viewerIsOwner();
+  const { tiers, sales, totals, byMethod, daily } = await getDashboard({ owner });
   const visible = tiers.filter((t) => !t.hidden);
   const firstDrop = visible.map((t) => t.salesStart).sort()[0];
   const pct = totals.capacity ? Math.round((totals.sold / totals.capacity) * 100) : 0;
@@ -46,6 +47,14 @@ async function Overview() {
           </b>{" "}
           Find {totals.oversold === 1 ? "it" : "them"} under <Link href="/admin/sales">Sales</Link> (marked Oversold) and either
           refund in Bachs or raise the tier&apos;s quantity.
+        </p>
+      )}
+
+      {owner && totals.publicity > 0 && (
+        <p className="ad-owner-note">
+          <span className="ad-pill ad-pill-publicity">Owner view</span> Revenue includes{" "}
+          <b>{naira(totals.publicity)}</b> in the publicity fund. Admins see the main account:{" "}
+          <b>{naira(totals.mainBalance)}</b>. <Link href="/admin/publicity">Manage</Link>
         </p>
       )}
 
@@ -97,53 +106,9 @@ async function Overview() {
         />
       </div>
 
-      <div className="ad-grid ad-grid-wide">
-        <Card title="Daily sales" subtitle="Tickets sold per day, Lagos time">
-          <DailyChart points={daily} />
-        </Card>
-        <Card title="Tiers" subtitle="Sold against what's available" action={<Link className="ad-link" href="/admin/tiers">Manage</Link>}>
-          {tiers.length === 0 ? (
-            <p className="ad-muted">No tiers yet.</p>
-          ) : (
-            <ul className="ad-tiers">
-              {tiers.map((t) => {
-                const status = t.remaining === 0 ? "soldout" : tierStatus(t, now);
-                return (
-                  <li key={t.id}>
-                    <div className="ad-tier-top">
-                      <span className="ad-tier-name">{t.name}</span>
-                      <span className={`ad-pill ad-pill-${status}`}>
-                        {status === "soldout" ? "Sold out" : status === "on-sale" ? "On sale" : status === "upcoming" ? "Upcoming" : "Ended"}
-                      </span>
-                    </div>
-                    <div className="ad-tier-sub">
-                      {formatNaira(t.priceNaira)}
-                      {t.description && <> · {t.description}</>}
-                      {t.hidden && <> · Hidden</>}
-                    </div>
-                    <div
-                      className="ad-meter"
-                      role="meter"
-                      aria-valuemin={0}
-                      aria-valuemax={t.quantity}
-                      aria-valuenow={t.sold}
-                      aria-label={`${t.name}: ${t.sold} of ${t.quantity} sold`}
-                    >
-                      <span style={{ width: `${t.quantity ? (t.sold / t.quantity) * 100 : 0}%` }} />
-                    </div>
-                    <div className="ad-tier-figs">
-                      <span>
-                        <b>{t.sold}</b> / {t.quantity} sold
-                      </span>
-                      <span>{naira(t.revenue)}</span>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Card>
-      </div>
+      <Card title="Daily sales" subtitle="Tickets sold per day, Lagos time">
+        <DailyChart points={daily} />
+      </Card>
 
       <div className="ad-grid ad-grid-wide">
         <Card title="Recent sales" action={sales.length ? <Link className="ad-link" href="/admin/sales">View all</Link> : undefined}>

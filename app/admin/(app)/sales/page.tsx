@@ -4,7 +4,7 @@ import { formatNaira } from "@/lib/ticket-types";
 import { SalesTable } from "../../SalesTable";
 import { PageHeader, PageSkeleton } from "../../ui/PageHeader";
 import { RecordSale } from "../../ui/RecordSale";
-import { checkSetup } from "../../ui/setup";
+import { checkSetup, viewerIsOwner } from "../../ui/setup";
 
 export const metadata = { title: "Sales | Neon Night admin" };
 
@@ -19,7 +19,7 @@ export default function SalesPage() {
 async function Sales() {
   const notice = await checkSetup();
   if (notice) return notice;
-  const { tiers, sales, totals } = await getDashboard();
+  const { tiers, sales, totals } = await getDashboard({ owner: await viewerIsOwner() });
   return (
     <>
       <PageHeader

@@ -21,6 +21,8 @@ type SaleRow = {
   created_at: string;
   tickets_sent_at: string | null;
   email_error: string | null;
+  publicity: boolean;
+  publicity_note: string | null;
   ticket_tiers: { name: string } | null;
 };
 
@@ -41,6 +43,8 @@ const fromRow = (r: SaleRow): Sale => ({
   createdAt: new Date(r.created_at).toISOString(),
   emailed: Boolean(r.tickets_sent_at),
   emailError: r.email_error,
+  publicity: r.publicity,
+  publicityNote: r.publicity_note,
 });
 
 /** Records a sale; the database refuses it if the tier doesn't have enough tickets left. */
@@ -89,35 +93,48 @@ export type Dashboard = {
     refunds: number;
     online: number;
     oversold: number;
+    /** Owner view only (zero for admins): money moved to the publicity fund, and what's left. */
+    publicity: number;
+    publicityOrders: number;
+    mainBalance: number;
   };
   byMethod: { method: PaymentMethod; revenue: number; orders: number }[];
   daily: DayPoint[];
   loadedAt: number;
 };
 
-/** Everything the admin dashboard shows. Admin only; never cached. */
-export async function getDashboard(): Promise<Dashboard> {
+/**
+ * Everything the admin dashboard shows. Never cached.
+ * Publicity-fund sales still count towards each tier's tickets sold (so availability stays right),
+ * but only the owner sees them as sales or money; for admins they're left out of the list and totals.
+ */
+export async function getDashboard({ owner = false }: { owner?: boolean } = {}): Promise<Dashboard> {
   await connection();
   const [{ tiers, loadedAt }, salesResult] = await Promise.all([
     getAllTiers(),
     supabase()
       .from("ticket_sales")
       .select(
-        "id, tier_id, buyer_name, buyer_email, quantity, unit_price_naira, total_naira, payment_method, note, status, source, oversold, hold_expires_at, created_at, tickets_sent_at, email_error, ticket_tiers(name)",
+        "id, tier_id, buyer_name, buyer_email, quantity, unit_price_naira, total_naira, payment_method, note, status, source, oversold, hold_expires_at, created_at, tickets_sent_at, email_error, publicity, publicity_note, ticket_tiers(name)",
       )
       .order("created_at", { ascending: false })
       .limit(5000),
   ]);
   if (salesResult.error) throw new Error(`Could not load sales: ${salesResult.error.message}`);
   const rows = salesResult.data as unknown as SaleRow[];
-  const sales = rows.map(fromRow);
+  const allSales = rows.map(fromRow);
+  const allPaid = allSales.filter((s) => s.status === "paid");
+  // What this viewer may see as sales and money.
+  const sales = owner ? allSales : allSales.filter((s) => !s.publicity).map((s) => ({ ...s, publicity: false, publicityNote: null }));
   const paid = sales.filter((s) => s.status === "paid");
+  const publicityPaid = owner ? allPaid.filter((s) => s.publicity) : [];
   // Online orders still inside their payment window hold tickets too.
   const holding = rows.filter((r) => r.status === "pending" && r.hold_expires_at && Date.parse(r.hold_expires_at) > loadedAt);
 
   const tierStats: TierStats[] = tiers.map((t) => {
     const mine = paid.filter((s) => s.tierId === t.id);
-    const sold = mine.reduce((n, s) => n + s.quantity, 0);
+    // Tickets sold counts every paid sale, publicity ones included.
+    const sold = allPaid.filter((s) => s.tierId === t.id).reduce((n, s) => n + s.quantity, 0);
     const held = holding.filter((r) => r.tier_id === t.id).reduce((n, r) => n + r.quantity, 0);
     return { ...t, sold, held, remaining: Math.max(t.quantity - sold - held, 0), revenue: mine.reduce((n, s) => n + s.totalNaira, 0) };
   });
@@ -153,11 +170,13 @@ export async function getDashboard(): Promise<Dashboard> {
   const capacity = tierStats.reduce((n, t) => n + t.quantity, 0);
   const sold = tierStats.reduce((n, t) => n + t.sold, 0);
   const held = tierStats.reduce((n, t) => n + t.held, 0);
+  const revenue = paid.reduce((n, s) => n + s.totalNaira, 0);
+  const publicity = publicityPaid.reduce((n, s) => n + s.totalNaira, 0);
   return {
     tiers: tierStats,
     sales,
     totals: {
-      revenue: paid.reduce((n, s) => n + s.totalNaira, 0),
+      revenue,
       sold,
       held,
       capacity,
@@ -166,9 +185,21 @@ export async function getDashboard(): Promise<Dashboard> {
       refunds: sales.filter((s) => s.status === "refunded").length,
       online: paid.filter((s) => s.source === "online").length,
       oversold: paid.filter((s) => s.oversold).length,
+      publicity,
+      publicityOrders: publicityPaid.length,
+      mainBalance: revenue - publicity,
     },
     byMethod: [...byMethod.entries()].map(([method, m]) => ({ method, ...m })).sort((a, b) => b.revenue - a.revenue),
     daily,
     loadedAt,
   };
+}
+
+/** Owner only: moves a paid sale into (or back out of) the publicity fund. */
+export async function setPublicity(id: string, on: boolean, note: string | null) {
+  const { error } = await supabase()
+    .from("ticket_sales")
+    .update(on ? { publicity: true, publicity_at: new Date().toISOString(), publicity_note: note } : { publicity: false, publicity_at: null, publicity_note: null })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
 }

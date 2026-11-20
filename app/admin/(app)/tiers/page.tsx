@@ -4,7 +4,7 @@ import { formatLagos, formatNaira, tierStatus } from "@/lib/ticket-types";
 import { TierEditor } from "../../TierEditor";
 import { IconPlus } from "../../ui/Icons";
 import { PageHeader, PageSkeleton } from "../../ui/PageHeader";
-import { checkSetup } from "../../ui/setup";
+import { checkSetup, viewerIsOwner } from "../../ui/setup";
 
 export const metadata = { title: "Tiers | Neon Night admin" };
 
@@ -21,7 +21,7 @@ const LABEL = { upcoming: "Upcoming", "on-sale": "On sale", ended: "Ended", sold
 async function Tiers() {
   const notice = await checkSetup();
   if (notice) return notice;
-  const { tiers, loadedAt: now } = await getDashboard();
+  const { tiers, loadedAt: now } = await getDashboard({ owner: await viewerIsOwner() });
   return (
     <>
       <PageHeader title="Tiers" subtitle="Prices, how many are available and when each goes on sale." />

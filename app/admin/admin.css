@@ -1774,3 +1774,82 @@ p.admin-error {
   text-underline-offset: 3px;
   cursor: pointer;
 }
+
+/* ---------- Owner: publicity fund ---------- */
+
+.ad-kpis-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 760px) {
+  .ad-kpis-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.ad-kpi-accent {
+  border-color: rgb(196 140 255 / 0.4);
+  background:
+    radial-gradient(120% 140% at 100% 0%, rgb(196 140 255 / 0.12), transparent 60%),
+    var(--ad-surface);
+}
+
+.ad-kpi-accent .ad-kpi-icon {
+  background: rgb(196 140 255 / 0.14);
+  color: #c48cff;
+}
+
+.ad-pill-publicity {
+  background: rgb(196 140 255 / 0.14);
+  color: #d4a8ff;
+}
+
+.ad-table td .ad-pill-publicity {
+  margin-top: 0.3rem;
+}
+
+.ad-toolbar-inline {
+  padding: 0 0 1rem;
+  border-bottom: 0;
+}
+
+.ad-owner-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgb(196 140 255 / 0.3);
+  border-radius: 12px;
+  background: rgb(196 140 255 / 0.06);
+  color: var(--ad-text-2);
+}
+
+.ad-owner-note a {
+  color: #d4a8ff;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ad-pub-move {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.ad-pub-note {
+  width: 11rem;
+  height: 30px;
+  padding: 0 0.6rem;
+  border: 1px solid var(--ad-border-strong);
+  border-radius: 8px;
+  background: var(--ad-bg);
+  color: var(--ad-text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.ad-pub-note:focus {
+  border-color: #c48cff;
+  outline: none;
+}

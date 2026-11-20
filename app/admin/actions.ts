@@ -4,8 +4,8 @@ import { refresh, updateTag } from "next/cache";
 import { after } from "next/server";
 import { fulfilSale } from "@/lib/fulfil";
 import { redirect } from "next/navigation";
-import { endAdminSession, isAdminConfigured, requireAdmin, roleForPassword, startSession } from "@/lib/admin-auth";
-import { recordSale, refundSale } from "@/lib/sales";
+import { endAdminSession, isAdminConfigured, requireAdmin, requireOwner, roleForPassword, startSession } from "@/lib/admin-auth";
+import { recordSale, refundSale, setPublicity } from "@/lib/sales";
 import { parseSaleForm, parseTierForm, type FieldErrors, type SaleErrors } from "@/lib/ticket-types";
 import { createTier, deleteTier, TIERS_TAG, updateTier } from "@/lib/tickets";
 
@@ -106,5 +106,16 @@ export async function resendEmailsAction(form: FormData) {
   } catch (e) {
     console.error(`Resending emails for sale ${id} failed:`, e);
   }
+  refresh();
+}
+
+/** Owner only: move a paid sale into the publicity fund, or back to the main account. */
+export async function setPublicityAction(form: FormData) {
+  await requireOwner();
+  const id = String(form.get("id") ?? "");
+  if (!id) return;
+  const on = form.get("on") === "1";
+  const note = String(form.get("note") ?? "").trim().slice(0, 200) || null;
+  await setPublicity(id, on, note);
   refresh();
 }

@@ -1,4 +1,4 @@
-import { isAdminConfigured, requireAdmin } from "@/lib/admin-auth";
+import { getRole, isAdminConfigured, requireAdmin } from "@/lib/admin-auth";
 import { isSupabaseConfigured } from "@/lib/supabase";
 import { Card } from "./PageHeader";
 
@@ -8,6 +8,11 @@ export async function checkSetup(): Promise<React.ReactNode | null> {
   await requireAdmin();
   if (!isSupabaseConfigured()) return <Notice missing="NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY" />;
   return null;
+}
+
+/** True when the signed-in person is the owner (sees the publicity fund). */
+export async function viewerIsOwner() {
+  return (await getRole()) === "owner";
 }
 
 function Notice({ missing }: { missing: string }) {
